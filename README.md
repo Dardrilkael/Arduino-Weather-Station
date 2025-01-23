@@ -1,38 +1,45 @@
-# Arduino Weather Station
+<div align="center">
+	<img src="docs/logo.png" alt="logo" widht="100%" height="auto">
+	<br/>
+	<br/>
+</div>
 
-This project uses an ESP32 to measure various weather parameters and send the data via MQTT. The parameters measured include:
+# MeteoroSense
+## Sistema Embarcado para captação de dados meteorológicos
 
-- Wind Speed
-- Wind Gust
-- Humidity
-- Temperature
-- Wind Direction
-- Rain
-- Atmospheric Pressure
+Este repositório contém o código-fonte de um sistema integrado de gestão meteorológica para a Universidade Federal do Rio de Janeiro (UFRJ).
 
-## Components
+## Como usar
 
-- ESP32
-- Wind Speed Sensor
-- Wind Gust Sensor
-- Humidity Sensor
-- Temperature Sensor
-- Wind Direction Sensor
-- Rain Sensor
-- Atmospheric Pressure Sensor
+Para usar o sistema, você precisará:
 
-## Setup
+1. Clonar o repositório.
+2. Instalar as dependências.
+3. Configurar o sistema.
 
-1. Connect the sensors to the ESP32 according to the wiring diagram.
-2. Configure the MQTT settings in the configt.txt.
-3. Upload the code to the ESP32.
-4. Monitor the weather data via the MQTT broker.
+Para obter mais informações, consulte a documentação do sistema.
 
-## Code
+# Circuitos
 
-The code for this project can be found in the `src` directory.
+Para esse projeto, desenvolvemos uma placa customizada baseada no microcontrolador ESP-32. Esta placa foi concebida com o intuito específico de atender às exigências do projeto, proporcionando um conjunto abrangente de funcionalidades para a coleta e processamento de dados meteorológicos. Integrando uma gama de sensores e um design eficiente, a placa oferece um desempenho excepcional. Além disso, sua arquitetura versátil permite uma fácil integração com outros componentes do sistema, tornando-a uma escolha ideal para otimizar a operação.
 
+Dedicamos atenção especial à economia de recursos durante o processo de fabricação, visando minimizar os custos de produção. Implementamos estratégias para alcançar esse objetivo, sem comprometer a qualidade ou desempenho da placa. Isso resultou em uma solução acessível e viável, permitindo uma ampla utilização em diversas aplicações meteorológicas, desde projetos pessoais até implantações em larga escala.
 
-## License
+<div align="center">
+	<img src="docs/board.png" alt="logo" widht="100%" height="auto">
+	<br/>
+	<br/>
+</div>
 
-This project is licensed under the MIT License.
+## Contato
+
+Para mais informações, entre em contato com o autor do projeto:
+
+# Dependencias externas
+ * [DHT-sensor-library](https://github.com/adafruit/DHT-sensor-library)
+ * [NTPClient](https://github.com/arduino-libraries/NTPClient)
+ * [PubSubClient](https://github.com/knolleary/pubsubclient)
+ * [Adafruit_BMP085](https://github.com/adafruit/Adafruit-BMP085-Library)
+ * [DHT-sensor-library](https://github.com/adafruit/DHT-sensor-library)
+ * [ArduinoBLE](https://github.com/arduino-libraries/ArduinoBLE)
+ * [Aduinojson](https://arduinojson.org/?utm_source=meta&utm_medium=library.properties)
