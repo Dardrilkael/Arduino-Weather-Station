@@ -5,10 +5,6 @@
 #include <Adafruit_BMP085.h>
 #include <cfloat>
 
-#define periodMax 2000
-unsigned int Periods[periodMax]{~0};
-int periodIndex = 0;
-
 //Temperatura e Humidade
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -23,8 +19,19 @@ unsigned int rainCounter = 0;
 float anemometerCounter = 0.0f;
 unsigned long lastVVTImpulseTime = 0;
 unsigned long smallestDeltatime=4294967295;
-
+unsigned int gustIndex = 0;  
+unsigned int previousCounter= 0;
 Sensors sensors;
+int rps[60]{0};
+
+void resetSensors(){
+  rainCounter = 0;
+  anemometerCounter = 0;
+  smallestDeltatime = 4294967295;
+  gustIndex=0; 
+  previousCounter = 0;
+  memset(rps,0,sizeof(rps));
+}
 
 void setupSensors(){
   // Inciando DHT
@@ -66,8 +73,6 @@ void anemometerChange() {
   unsigned long currentMillis = millis();
   unsigned long deltaTime = currentMillis - lastVVTImpulseTime;
   if (deltaTime >= DEBOUNCE_DELAY) {
-    Periods[(periodIndex++)]=deltaTime;
-    periodIndex =periodMax%2000;
     smallestDeltatime = min(deltaTime, smallestDeltatime);
     anemometerCounter++;
     lastVVTImpulseTime = currentMillis;
@@ -109,37 +114,57 @@ void BMPRead(float& press)
 }
 
 
-float find_index_sum_and_distance(unsigned int *data_array, int size) {
-  Serial.print("Size: ");Serial.println(size);
-    int min_index = 0;
-    for (int i = 1; i < size; ++i) {
-        if (data_array[i] < data_array[min_index]) {
-            min_index = i;
-        }
+
+void WindGustRead(unsigned int now)
+{
+  static unsigned int lastAssignement = 0;
+
+  int gustInterval = now-lastAssignement;
+    if(gustInterval>=1000)
+    {
+      lastAssignement= now;
+      int revolutions = anemometerCounter- previousCounter;
+      previousCounter=anemometerCounter;
+      rps[gustIndex++] = revolutions;
+      gustIndex = gustIndex%(sizeof(rps)/sizeof(int));
     }
-    printf("Index of the minimum element: %d\n", min_index);
-    int total_sum = data_array[min_index];
-    int left_index = min_index - 1;
-    int right_index = min_index + 1;
-    int result = 0;
-    int distance = 1;
-
-    while (total_sum < 2000 && (left_index >= 0 || right_index < size)) {
-        if (left_index >= 0) {
-            total_sum += data_array[left_index];
-            result += 1.0 / data_array[left_index];
-            distance += 1;
-            --left_index;
-        }
-
-        if (right_index < size) {
-            total_sum += data_array[right_index];
-            result += 1.0 / data_array[right_index];
-            ++right_index;
-            ++distance;
-        }
-    }
-
-    return  (float)distance / (float)total_sum;
-
 }
+void windGustReset(){gustIndex=0;  previousCounter = 0;}
+
+int findMax(int arr[], int size) {
+    if (size <= 0) {
+        printf("Array is empty.\n");
+        return 0; 
+    }
+    int max = arr[0];
+    for (int i = 1; i < size; i++) {
+        if (arr[i] > max) {
+            max = arr[i];
+        }
+    }
+    return max;
+}
+
+float gust(const int* data, int size, int width)
+{
+	const int* begin = data;
+
+	float maxSum = 0.0f;
+
+	do
+	{
+		float sum = 0.0f;
+		for (const int* ptr = begin; ptr < begin + width; ptr++)
+		{
+			sum += *ptr;
+		}
+
+		if (sum > maxSum)
+			maxSum = sum;
+
+		begin++;
+	} while (begin + width <= data + size);
+
+	return maxSum;
+}
+

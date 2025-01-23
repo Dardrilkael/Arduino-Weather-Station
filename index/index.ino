@@ -1,6 +1,6 @@
 // Autor: Lucas Fonseca e Gabriel Fonseca
 // Titulo: Sit arduino
-// Versão: 1.6.6 Watch-dog;
+// Versão: 2.0.5 gust refactor_2;
 //.........................................................................................................................
 
 #include "constants.h"
@@ -14,32 +14,31 @@
 #include <string>
 #include <vector>
 #include <rtc_wdt.h>
+#include "mqtt.h"
+#include "OTA.h"
 
-// -- WATCH-DOG
-#define WDT_TIMEOUT 100000   
+#define WDT_TIMEOUT 150000 // -- WATCH-DOG
 
-// Pluviometro
-extern unsigned long lastPVLImpulseTime;
+extern unsigned long lastPVLImpulseTime; // Pluviometro
 extern unsigned int rainCounter;
-
-// Anemometro (Velocidade do vento)
-extern unsigned long lastVVTImpulseTime;
+extern unsigned long lastVVTImpulseTime; // Anemometro (Velocidade do vento)
 extern float anemometerCounter;
-extern unsigned long smallestDeltatime;
-extern unsigned int * Periods;
-extern int periodIndex;
+extern int rps[20];
+
 // Sensors
 extern Sensors sensors;
-
-
-
 
 // globals
 long startTime;
 int timeRemaining=0;
 std::string jsonConfig;
 String formatedDateString = "";
-struct HealthCheck healthCheck = {"1.6.6", 0, false, false, 0, 0};
+struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
+String output;
+// -- MQTT
+String softwareReleaseMqttTopic;
+MQTT mqqtClient1;
+MQTT mqqtClient2;
 
 void logIt(const std::string &message, bool store = false){
   Serial.print(message.c_str());
@@ -54,7 +53,6 @@ void watchdogRTC()
     rtc_wdt_disable();
     rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
     rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT); // timeout rtd_wdt 10000ms.
-    
     rtc_wdt_enable();           //Start the RTC WDT timer
     rtc_wdt_protect_on();       //Enable RTC WDT write protection
 }
@@ -78,10 +76,8 @@ void setup() {
 
   logIt("\nIniciando cartão SD");
   
-
   initSdCard();
   
-
   logIt("\nCriando diretorios padrões");
   createDirectory("/metricas");
   createDirectory("/logs");
@@ -94,7 +90,7 @@ void setup() {
   BLE::updateValue(CONFIGURATION_UUID, jsonConfig);
 
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
-  setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
+  setupWifi("  - Wifi", "Gabriel","2014072276");
   int nivelDbm = (WiFi.RSSI()) * -1;
   storeLog((String(nivelDbm) + ";").c_str());
 
@@ -102,8 +98,15 @@ void setup() {
   connectNtp("  - NTP");
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
-  setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+  mqqtClient1.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+   softwareReleaseMqttTopic =String("software-release/") + String(config.station_name);
 
+  mqqtClient2.setupMqtt("- MQTT2", config.mqtt_hostV2_server, config.mqtt_hostV2_port, config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
+  mqqtClient2.setCallback(mqttSubCallback);
+  mqqtClient2.setBufferSize(700);
+  mqqtClient2.subscribe((String("sys/") + String(config.station_name)).c_str());
+
+  output =(String("sys-report/")+String(config.station_name));
   logIt("\n\n1.5 Iniciando controllers;", true);
   setupSensors();
 
@@ -123,13 +126,15 @@ void setup() {
   // -- WATCH-DOG
   watchdogRTC();
 
-  //Yellow Blink
   for(int i=0; i<7; i++) {
     digitalWrite(LED1,i%2);
     delay(400);
   }
-
+  const char * hcCsv = parseHealthCheckData(healthCheck, 1);
+  mqqtClient2.publish(output.c_str(),hcCsv );
   startTime = millis();
+
+  printConfig(config);
 }
 
 void loop() {
@@ -144,31 +149,47 @@ void loop() {
 
   convertTimeToLocaleDate(timestamp);
 
-  rainCounter = 0;
-  anemometerCounter = 0;
-  smallestDeltatime = 4294967295;
-  periodIndex=0;
-  //memset(Periods,~0,2000*sizeof(unsigned int));
+  resetSensors();
 
   do {
-    timeRemaining = startTime + config.interval - millis();
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    if (command == 'r' || command == 'R') {
+      Serial.println("Restarting...");
+      delay(100);
+      ESP.restart();
+    }
+  }
+  
+
+    unsigned long now = millis();
+    timeRemaining = startTime + config.interval - now;
+    //calculate
+    mqqtClient2.loopMqtt();
+    WindGustRead(now);
     if(ceil(timeRemaining % 5000) != 0) continue;
 
     // Health check
     healthCheck.timestamp = timestamp;
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
     healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI()) * -1;
-    healthCheck.isMqttConnected = mqttClient.loop();
+    healthCheck.isMqttConnected = mqqtClient1.loopMqtt();
     healthCheck.timeRemaining = timeRemaining;
 
     const char * hcCsv = parseHealthCheckData(healthCheck, 1);
 
     Serial.printf("\n\nColetando dados, metricas em %d segundos ...", (timeRemaining / 1000));
     Serial.printf("\n  - %s",hcCsv);
+    mqqtClient2.publish(output.c_str(),"Coletando dados, metricas em: " );
+    mqqtClient2.publish(output.c_str(),String(timeRemaining / 1000).c_str() );
+    mqqtClient2.publish(output.c_str(),hcCsv );
 
     // Garantindo conexão com mqqt broker;
     if (healthCheck.isWifiConnected && !healthCheck.isMqttConnected) {
-      healthCheck.isMqttConnected = connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+      healthCheck.isMqttConnected = mqqtClient1.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+    }
+    if(!mqqtClient2.loopMqtt()) {
+      mqqtClient2.connectMqtt("\n  - MQTT2", config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
     }
 
     // Atualizando BLE advertsting value
@@ -178,14 +199,15 @@ void loop() {
   } while (timeRemaining > 0);
   startTime = millis();
   // Computando dados
+  
   Serial.printf("\n\n Computando dados ...\n");
-
+  mqqtClient2.publish(output.c_str(),"Computando dados ..." );
   Data.timestamp = timestamp;
   Data.wind_dir = getWindDir();
   Data.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
-  Data.wind_gust = (3052.0f * ANEMOMETER_CIRC) * find_index_sum_and_distance(Periods, periodIndex%2000);
-  
-  Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (INTERVAL / 1000.0); // m/s
+  //Data.wind_gust  = 3.052f /3.0f* ANEMOMETER_CIRC *findMax(rps,sizeof(rps)/sizeof(int));
+  Data.wind_gust  = 3.052f /3.0f* ANEMOMETER_CIRC *gust(rps,sizeof(rps)/sizeof(int),3);
+  Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (config.interval / 1000.0); // m/s
   
   DHTRead(Data.humidity, Data.temperature);
   BMPRead(Data.pressure);
@@ -198,11 +220,11 @@ void loop() {
   // Armazenamento local
   Serial.println("\n Gravando em disco:");
   storeMeasurement("/metricas", formatedDateString, metricsCsvOutput);
-
+  mqqtClient2.publish(output.c_str(),"Gravando em disco" );
   // Enviando Dados Remotamente
   Serial.println("\n Enviando Resultados:  ");
-  bool measurementSent = sendMeasurementToMqtt(config.mqtt_topic, metricsjsonOutput);
-
+  bool measurementSent = mqqtClient1.publish(config.mqtt_topic, metricsjsonOutput);
+  bool measurementSent2 = mqqtClient2.publish(config.mqtt_topic, metricsjsonOutput);
   // Update metrics advertsting value
   BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
   Serial.printf("\n >> PROXIMA ITERAÇÃO\n");
@@ -232,6 +254,71 @@ int bluetoothController(const char *uid, const std::string &content) {
   }
   return 0;
 }
+#include <ArduinoJson.h>
+void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
+  char* jsonBuffer = new char[length + 1];
+  memcpy(jsonBuffer, (char*)payload, length);
+  jsonBuffer[length] = '\0';
+  Serial.println(jsonBuffer);
+  Serial.println(topic);
+  DynamicJsonDocument doc(length + 1); // Specify capacity
+  DeserializationError error = deserializeJson(doc, jsonBuffer);
+  Serial.println("executing");
+  // Check for parsing errors
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    // Release dynamically allocated memory
+    delete[] jsonBuffer;
+    return;
+  }
+
+  if(strcmp(topic,softwareReleaseMqttTopic.c_str())==0 && doc.containsKey("data")){
+    // Extract the value of the "data" field (assuming it's a string)
+    const char* url = doc["data"];
+
+    // Print the extracted URL
+    Serial.print("URL: ");
+    Serial.println(url);
+    String urlStr(url);
+    OTA::update(urlStr);
+  }
+
+  if (doc.containsKey("command")){
+    const char* command = doc["command"];
+
+    if (strcmp(command, "reset") == 0) {
+      Serial.println("Executing reset command");
+      mqqtClient2.publish(output.c_str(),"Executing reset command" );
+      ESP.restart();
+      // Perform reset action
+    } else if (strcmp(command, "configure") == 0) {
+      // Execute configure command
+      char buff[700]{0};
+      readFileToCharArray("/config.txt",buff,550);
+      Serial.println(buff);
+      mqqtClient2.publish(output.c_str(),buff);
+      Serial.println("Executing configure command");
+      // Perform configure action
+    }
+    else if (strcmp(command, "setting") == 0) {
+      // Execute configure command
+      const char* content = doc["setting"];
+      Serial.print("conteudo: ");
+      Serial.println(content);
+      mqqtClient2.publish(output.c_str(),content);
+      createFile(SD, "/config.txt", content);
+      Serial.println("Executing setting command");
+      // Perform configure action
+    }
+  }
+  
+
+
+  // Release dynamically allocated memory
+  delete[] jsonBuffer;
+}
+
 
 void convertTimeToLocaleDate(long timestamp) {
   struct tm *ptm = gmtime((time_t *)&timestamp);
