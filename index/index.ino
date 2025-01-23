@@ -36,7 +36,6 @@ struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 String sysReportMqqtTopic;
 String softwareReleaseMqttTopic;
 MQTT mqqtClient1;
-MQTT mqqtClient2;
 
 // -- Novo
 int wifiDisconnectCount=0;
@@ -58,6 +57,7 @@ void watchdogRTC() {
 }
 
 void setup() {
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   Serial.begin(115200);
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   delay(3000);
@@ -104,17 +104,17 @@ void setup() {
   storeLog((String(nivelDbm) + ";").c_str());
 
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
-    
+  connectNtp("  - NTP");
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
   mqqtClient1.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
-  softwareReleaseMqttTopic =String("software-release/") + String(config.station_name);
+  softwareReleaseMqttTopic = String("software-release/") + String(config.mqtt_topic);
 
-  mqqtClient2.setupMqtt("- MQTT2", config.mqtt_hostV2_server, config.mqtt_hostV2_port, config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
-  mqqtClient2.setCallback(mqttSubCallback);
-  mqqtClient2.setBufferSize(512);
-  mqqtClient2.subscribe((String("sys/") + String(config.station_name)).c_str());
-  sysReportMqqtTopic =(String("sys-report/")+String(config.station_name));
+  //mqqtClient2.setupMqtt("- MQTT2", config.mqtt_hostV2_server, config.mqtt_hostV2_port, config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
+  mqqtClient1.setCallback(mqttSubCallback);
+  mqqtClient1.setBufferSize(512);
+  mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+  sysReportMqqtTopic =(String("sys-report")+String(config.mqtt_topic));
 
   logIt("\n\n1.5 Iniciando controllers;", true);
   setupSensors();
@@ -140,7 +140,7 @@ void setup() {
     delay(400);
   }
   
-  mqqtClient2.publish((sysReportMqqtTopic+String("/handshake")).c_str(), "{\"version\":\""FIRMWARE_VERSION"\"}");
+  mqqtClient1.publish((sysReportMqqtTopic+String("/handshake")).c_str(), "{\"version\":\""FIRMWARE_VERSION"\"}");
   startTime = millis();
 }
 
@@ -167,7 +167,8 @@ void loop() {
     timeRemaining = startTime + config.interval - now;
 
     WindGustRead(now);
-
+    //TODO DELETE
+    mqqtClient1.loopMqtt();
     if(ceil(timeRemaining % 5000) != 0) continue;
 
     // Health check
@@ -187,9 +188,6 @@ void loop() {
       healthCheck.isMqttConnected = mqqtClient1.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
     }
 
-    if(healthCheck.isWifiConnected && !mqqtClient2.loopMqtt()) {
-      mqqtClient2.connectMqtt("\n  - MQTT2", config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
-    }
   
     // Atualizando BLE advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
@@ -213,7 +211,7 @@ void loop() {
 
   // Apresentação
   parseData();
-  OnDebug(Serial.printf("\nResultado CSV:\n%s", metricsCsvOutput); )
+  //OnDebug(Serial.printf("\nResultado CSV:\n%s", metricsCsvOutput); )
   OnDebug(Serial.printf("\nResultado JSON:\n%s\n", metricsjsonOutput);)
 
   // Armazenamento local
@@ -223,7 +221,6 @@ void loop() {
   // Enviando Dados Remotamente
   OnDebug(Serial.println("\n Enviando Resultados:  ");)
   bool measurementSent1 = mqqtClient1.publish(config.mqtt_topic, metricsjsonOutput);
-  bool measurementSent2 = mqqtClient2.publish(config.mqtt_topic, metricsCsvOutput);
   if(!measurementSent1)
     storeMeasurement("/falhas", formatedDateString, metricsCsvOutput);
   // Update metrics advertsting value
@@ -272,10 +269,10 @@ void executeCommand(JsonObject& docData, const char* sysReportMqqtTopic) {
             const char* dirPath = docData["dir"] | "/";
             File dir = SD.open(dirPath);
             if (!dir || !dir.isDirectory()) {
-               mqqtClient2.publish(sysReportMqqtTopic, "Could not open directory");
+               mqqtClient1.publish(sysReportMqqtTopic, "Could not open directory");
                 return;
             }
-            for (const char* dirList; (dirList = listDirectory(dir, 256))[0]; mqqtClient2.publish(sysReportMqqtTopic, dirList));
+            for (const char* dirList; (dirList = listDirectory(dir, 256))[0]; mqqtClient1.publish(sysReportMqqtTopic, dirList));
             dir.close();
             break;}
 
@@ -284,12 +281,21 @@ void executeCommand(JsonObject& docData, const char* sysReportMqqtTopic) {
             File file = SD.open(filename);
             if (!file) 
                 return;
-            mqqtClient2.beginPublish(sysReportMqqtTopic, file.size(), false);
-            while(file.available()){
-              size_t bytesRead = file.readBytes(buffer, 256);
-              mqqtClient2.write((unsigned char*)buffer,bytesRead);
-            }
-            mqqtClient2.endPublish();
+                //int a = file.size();
+                
+            int charCount = 0; 
+            while (file.available()) {charCount++;file.read();}
+            file.seek(0);
+            Serial.println(charCount,file.size());
+            if(mqqtClient1.beginPublish(sysReportMqqtTopic,charCount)){
+            while (file.available()) {
+              char c =file.read();
+               mqqtClient1.write(c);
+              }
+            mqqtClient1.endPublish();}
+            else mqqtClient1.publish(sysReportMqqtTopic, "Could not begin publish");
+            
+            //for (const char* chunk; (chunk = readFileLimited(file, 384,strCommand[1]))[0]; /*mqqtClient1.write((const unsigned char* )chunk,strlen(chunk))*/mqqtClient1.publish(sysReportMqqtTopic, chunk)) ;
             file.close();
             break;}
 
@@ -302,14 +308,14 @@ void executeCommand(JsonObject& docData, const char* sysReportMqqtTopic) {
         case 'd':{ // Delete file
             const char* filename = docData["fn"] | "";
             if (SD.remove(filename)) {
-              mqqtClient2.publish(sysReportMqqtTopic, "File_deleted_successfully");
+              mqqtClient1.publish(sysReportMqqtTopic, "File_deleted_successfully");
             } else {
-              mqqtClient2.publish(sysReportMqqtTopic, "could not delte file");
+              mqqtClient1.publish(sysReportMqqtTopic, "could not delte file");
             }
             break;
         }
         default:
-            mqqtClient2.publish(sysReportMqqtTopic, "Unknown command");
+            mqqtClient1.publish(sysReportMqqtTopic, "Unknown command");
             Serial.println("Unknown command");
             break;
     }
@@ -318,13 +324,13 @@ void executeCommand(JsonObject& docData, const char* sysReportMqqtTopic) {
 
 void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
     OnDebug(Serial.println("executing OTA");)
-
     char* jsonBuffer = new char[length + 1];
     memcpy(jsonBuffer, (char*)payload, length);
     jsonBuffer[length] = '\0';
+   
     Serial.println(jsonBuffer);
     Serial.println(topic);
-    
+
     DynamicJsonDocument doc(length + 1);
     DeserializationError error = deserializeJson(doc, jsonBuffer);
     delete[] jsonBuffer;
@@ -338,8 +344,11 @@ void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
     if (doc.containsKey("data")) {
         docData = doc["data"].as<JsonObject>(); 
     }
-
-    if (strcmp(topic, softwareReleaseMqttTopic.c_str()) == 0) {
+    serializeJson(docData, Serial); 
+   
+    if (docData.containsKey("cmd")) {
+       
+       if (strcmp(docData["cmd"],"update")==0) {
       const char* url = docData["url"];
       const char* id = docData["id"];
       if(!id) return;
@@ -351,24 +360,25 @@ void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
       const size_t capacity = 100;
       char jsonString[capacity];
       snprintf(jsonString, sizeof(jsonString), "{\"id\":\"%s\",\"status\":1}", id);
-      mqqtClient2.publish((sysReportMqqtTopic+String("/OTA")).c_str(), jsonString);
+      mqqtClient1.publish((sysReportMqqtTopic+String("/OTA")).c_str(), jsonString);
       bool result = OTA::update(urlStr);
 
-      printf("%d",result);
-      if(healthCheck.isWifiConnected && !mqqtClient2.loopMqtt()) {
-        mqqtClient2.connectMqtt("\n  - MQTT2", config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
-      }
+      /*printf("%d",result);
+      if(healthCheck.isWifiConnected && !mqqtClient1.loopMqtt()) {
+        mqqtClient1.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, softwareReleaseMqttTopic.c_str());
+      }*/
 
       snprintf(jsonString, sizeof(jsonString), "{\"id\":\"%s\",\"status\":%i}", id,4-2*result);
-      mqqtClient2.publish((sysReportMqqtTopic+String("/OTA")).c_str(), jsonString);
+      mqqtClient1.publish((sysReportMqqtTopic+String("/OTA")).c_str(), jsonString);
 
       Serial.println("Update successful!");
       OnDebug(Serial.println("Reiniciando");)
       delay(1500);
       ESP.restart();
     } 
-    else if (docData.containsKey("cmd")) {
-      executeCommand(docData, sysReportMqqtTopic.c_str());
+    else
+    executeCommand(docData, sysReportMqqtTopic.c_str());
+     
     }
 }
   

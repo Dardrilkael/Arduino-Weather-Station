@@ -13,11 +13,10 @@ bool loopMqtt();
 void setCallback(void (*callback)(char*, unsigned char*, unsigned int));
 void setBufferSize(int size);
 void subscribe(const char* mqtt_topic);
-bool beginPublish(const char* topic, unsigned int plength, bool retained);
-unsigned long long write(const unsigned char *buffer, unsigned long long size);
+bool beginPublish(const char* topic, unsigned int plength, bool retained= false);
 int endPublish();
-
-
+int write(char);
+int write(const unsigned char *buffer, int size);
 private:
 class WiFiClient* m_WifiClient;
 class PubSubClient* m_Client;

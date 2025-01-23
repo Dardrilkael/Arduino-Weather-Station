@@ -14,7 +14,7 @@
   }
   bool MQTT::publish(const char *topic, const char *payload)
   {
-    bool sent = (m_Client->publish(topic, payload, true));
+    bool sent = (m_Client->publish(topic, payload, false));
     if (sent){
       Serial.print("  - MQTT broker: Message publised ["); Serial.print(topic); Serial.println( "]: ");Serial.println(payload);
     } else {
@@ -30,7 +30,6 @@
     clientId += String(random(0xffff), HEX);
     if (m_Client->connect(clientId.c_str(), mqtt_username, mqtt_password)){
       OnDebug(Serial.printf("%s: Reconectado", contextName);)
-      subscribe(mqtt_topic);
       return true;
     }
     Serial.print("failed, rc=");
@@ -62,21 +61,24 @@
   }
 
   void MQTT::subscribe(const char* mqtt_topic){
-  m_Client->subscribe(mqtt_topic);
+    Serial.printf("Subscribed to %s\n",mqtt_topic);
+    m_Client->subscribe(mqtt_topic);
   }
 
   void MQTT::setCallback(void (*callback)(char*, unsigned char*, unsigned int)){
     m_Client->setCallback(callback);
   }
 
-  bool MQTT::beginPublish(const char* topic, unsigned int plength, bool retained){
-    return m_Client->beginPublish(topic,plength,retained);
-  }
 
-  unsigned long long MQTT::write(const unsigned char* buffer, unsigned long long size){
-    return m_Client->write(buffer,size);
-  }
-  
-  int MQTT::endPublish(){
-   return m_Client->endPublish();
-  }
+bool MQTT::beginPublish(const char* topic, unsigned int plength, bool retained){
+return m_Client->beginPublish(topic,plength,retained);
+}
+int MQTT::endPublish(){
+return m_Client->endPublish();
+}
+int MQTT::write(char c){
+return m_Client->write((c));
+}
+int MQTT::write(const unsigned char *buffer, int size){
+return m_Client->write(buffer,size);
+}

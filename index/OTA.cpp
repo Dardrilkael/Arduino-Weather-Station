@@ -28,8 +28,10 @@ bool OTA::update(const String& url) {
   Serial.printf("Downloading firmware binary (%d bytes)...\n", contentLength);
 
   if (Update.begin(contentLength)) {
+    Serial.println("BeginUpdate");
     WiFiClient* stream = http.getStreamPtr();
     if (Update.writeStream(*stream)) {
+      Serial.println("WrittingStream");
       Serial.printf(".");
       if (Update.end()) {
         Serial.printf("Downloading concluido com sucesso.");

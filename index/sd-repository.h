@@ -92,7 +92,7 @@ bool loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::st
         config.interval = doc["INTERVAL"] | 60000;
         parseWIFIString(doc["WIFI"],config.wifi_ssid,config.wifi_password);
         parseMQTTString(doc["MQTT_HOST"],config.mqtt_username,config.mqtt_password,config.mqtt_server,config.mqtt_port);
-        parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
+        //parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
         file.close();
         success = true;
         serializeJson(doc, configJson);
@@ -166,6 +166,16 @@ void storeMeasurement(String directory, String fileName, const char *payload){
 char buffer[BUFFER_SIZE];
 
 
+int getDirNameLength(File& dir){
+  int dirNameLength = 0;
+  while (true) {
+      File entry = dir.openNextFile();
+      if (!entry) break;
+      dirNameLength += strlen(entry.name());
+  }
+  return dirNameLength;
+}
+
 const char* listDirectory(File& dir, size_t limit) {
   buffer[0] = '\0'; // Clear buffer at the beginning of each function call
   size_t writtenLength = 0; // Initialize writtenLength to 0
@@ -188,6 +198,23 @@ const char* listDirectory(File& dir, size_t limit) {
   }
   return buffer; // Return the directory list buffer
 }
+
+const char * readFileLimited(File& file, size_t limit,bool allign) {
+    
+    size_t bytesRead = file.readBytes(buffer, limit);
+    buffer[bytesRead]='\0';
+    if(allign){
+    char *lastNewline = strrchr(buffer, '\n');
+
+    if (lastNewline != nullptr) {
+        *(lastNewline+1) = '\0';
+        file.seek(file.position() - bytesRead + lastNewline - buffer+1);
+    }
+    OnDebug(Serial.printf(buffer);)
+    }
+    return buffer;
+}
+
 
 // Adiciona uma nova linha de metricas
 void storeLog(const char *payload){
