@@ -25,83 +25,86 @@ unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE (50)
 char msg[MSG_BUFFER_SIZE];
 
-int connectWifi(char* ssid, char*password)
+/***** WIFI ****/
+
+int setupWifi(const char *contextName, char* ssid, char*password)
 {
+  Serial.printf("%s: Estabelecendo conexão inicial", contextName);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("\Wifi connection: trying to connect ");
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(100);
-  }
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+  // secureWifiClient.setCACert(root_ca);    // enable this line and the the "certificate" code for secure connection
+
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+  }
   
-  Serial.println("\nWifi connection: Connected to the WiFi network");
-  Serial.print("Wifi connection: Local ESP32 IP: ");
-  Serial.println(WiFi.localIP());
-  // secureWifiClient.setCACert(root_ca);      // enable this line and the the "certificate" code for secure connection
+  Serial.printf("\n%s: Contectado com sucesso \n", contextName);
+  Serial.printf("%s: IP address = %s \n", contextName, WiFi.localIP());
   return 1;
 }
 
 /***** MQTT ****/
 
-void callback(char *topic, byte *payload, unsigned int length)
+/* void callback(char *topic, byte *payload, unsigned int length)
 {
   String incommingMessage = "";
   for (int i = 0; i < length; i++)
     incommingMessage += (char)payload[i];
   Serial.println("MQTT broker: Recebimento confirmado [" + String(topic) + "]" + incommingMessage);
-}
+} */
 
-int sendMeasurementToMqtt(char *topic, const char *payload)
+bool sendMeasurementToMqtt(char *topic, const char *payload)
 {
-  if (mqttClient.publish(topic, payload, true))
-  {
-    Serial.println("MQTT broker: Message publised [" + String(topic) + "]: " + payload);
+  bool sent = (mqttClient.publish(topic, payload, true));
+  if (sent){
+    Serial.println("  - MQTT broker: Message publised [" + String(topic) + "]: ");
+  } else {
+    Serial.println("  - MQTT: Não foi possivel enviar");
   }
-  return 1;
+  return sent;
 }
 
-int setupMqtt(char* mqtt_server, int mqtt_port)
-{
-  mqttClient.setServer(mqtt_server, mqtt_port);
-  mqttClient.setCallback(callback);
-  return 1;
-}
-
-int connectMqtt(char* mqtt_username, char* mqtt_password, char* mqtt_topic)
-{
-  Serial.print("MQTT broker: ");
-  while (!mqttClient.connected())
-  {
-    Serial.print("Attempting MQTT connection...");
-    String clientId = "ESP8266Client-"; // Create a random client ID
+bool connectMqtt(const char *contextName, char* mqtt_username, char* mqtt_password, char* mqtt_topic) {
+  if (!mqttClient.connected()) {
+    Serial.printf("%s: Tentando nova conexão...", contextName);
+    String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
-    // Attempt to connect
-    if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password))
-    {
-      Serial.println("connected");
-      mqttClient.subscribe(mqtt_topic); // subscribe the topics here
+    if (mqttClient.connect(clientId.c_str(), mqtt_username, mqtt_password)){
+      Serial.printf("%s: Reconectado", contextName);
+      mqttClient.subscribe(mqtt_topic);
+      return true;
     }
-    else
-    {
-      Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" try again in 5 seconds"); // Wait 5 seconds before retrying
-      delay(5000);
-    }
+    Serial.print("failed, rc=");
+    Serial.print(mqttClient.state());
+    return false;
   }
-  return 1;
+  Serial.printf("%s: Conectado [ %s ]", contextName, mqtt_topic);
+  return true;
+}
+
+bool setupMqtt(const char *contextName, char* mqtt_server, int mqtt_port, char* mqtt_username, char* mqtt_password, char* mqtt_topic)
+{
+  Serial.printf("%s: Estabelecendo conexão inicial\n", contextName);
+  mqttClient.setServer(mqtt_server, mqtt_port);
+  // mqttClient.setCallback(callback);
+  return connectMqtt(contextName, mqtt_username, mqtt_password, mqtt_topic);
 }
 
 /* Ntp Client */
-int connectNtp()
+int connectNtp(const char *contextName)
 {
-  Serial.println("NTP connection : Tentando conectar....");
+  Serial.printf("%s: Estabelecendo conexão inicial\n", contextName);
+
   timeClient.begin();
-  Serial.println("NTP connection : Conectado com sucesso.");
+
+  while(!timeClient.update()) {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  Serial.printf("%s: Conectado com sucesso. \n", contextName);
   return 1;
 }
