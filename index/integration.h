@@ -17,7 +17,9 @@ WiFiClient wifiClient;
 
 /**** NTP Client Initialisation  *****/
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
+//const char* ntpServer = "a.st1.ntp.br";
+const char* ntpServer = "br.pool.ntp.org";
+NTPClient timeClient(ntpUDP,ntpServer);
 
 /**** MQTT Client Initialisation Using WiFi Connection *****/
 
@@ -44,7 +46,7 @@ int setupWifi(const char *contextName, char* ssid, char*password)
   }
   
   OnDebug(Serial.printf("\n%s: Contectado com sucesso \n", contextName);)
-  OnDebug(Serial.printf("%s: IP address = %s \n", contextName, WiFi.localIP());)
+  OnDebug(Serial.printf("%s: IP address = %s \n", contextName, WiFi.localIP().toString().c_str());)
   return 1;
 }
 

@@ -12,9 +12,9 @@
     delete m_WifiClient;
     delete m_Client;
   }
-  bool MQTT::publish(const char *topic, const char *payload)
+  bool MQTT::publish(const char *topic, const char *payload, bool retained)
   {
-    bool sent = (m_Client->publish(topic, payload, false));
+    bool sent = (m_Client->publish(topic, payload, retained));
     if (sent){
       Serial.print("  - MQTT broker: Message publised ["); Serial.print(topic); Serial.println( "]: ");Serial.println(payload);
     } else {
@@ -60,9 +60,9 @@
       m_Client->setBufferSize(size);
   }
 
-  void MQTT::subscribe(const char* mqtt_topic){
+  bool MQTT::subscribe(const char* mqtt_topic){
     Serial.printf("Subscribed to %s\n",mqtt_topic);
-    m_Client->subscribe(mqtt_topic);
+    return m_Client->subscribe(mqtt_topic);
   }
 
   void MQTT::setCallback(void (*callback)(char*, unsigned char*, unsigned int)){

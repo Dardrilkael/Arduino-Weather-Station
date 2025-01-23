@@ -9,10 +9,10 @@ struct Config {
     char mqtt_username[64]{0};
     char mqtt_password[64]{0};
     char mqtt_topic[64]{0};
-    //char mqtt_hostV2_server[64]{0};
-    //char mqtt_hostV2_username[64]{0};
-    //char mqtt_hostV2_password[64]{0};
-    //int mqtt_hostV2_port;
+    char mqtt_hostV2_server[64]{0};
+    char mqtt_hostV2_username[64]{0};
+    char mqtt_hostV2_password[64]{0};
+    int mqtt_hostV2_port;
     int mqtt_port;
     int interval;
 };

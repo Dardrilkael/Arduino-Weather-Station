@@ -92,7 +92,7 @@ bool loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::st
         config.interval = doc["INTERVAL"] | 60000;
         parseWIFIString(doc["WIFI"],config.wifi_ssid,config.wifi_password);
         parseMQTTString(doc["MQTT_HOST"],config.mqtt_username,config.mqtt_password,config.mqtt_server,config.mqtt_port);
-        //parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
+        parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
         file.close();
         success = true;
         serializeJson(doc, configJson);
@@ -132,32 +132,43 @@ void createFile(fs::FS &fs, const char * path, const char * message){
 }
 
 // Escreve em arquivo
-void appendFile(fs::FS &fs, const char * path, const char * message){
-    OnDebug(Serial.printf(" - Salvando dados no cartao SD: %s\n", path); )
+void appendFile(fs::FS &fs, const char * path, const char * message) {
+    Serial.printf(" - Salvando dados no cartao SD: %s\n", path);
 
+    
     File file = fs.open(path, FILE_APPEND);
-    if(!file){
-        OnDebug(Serial.println(" - Falha ao encontrar cartão SD");)
+    if (!file) {
+        Serial.println(" - Falha ao encontrar cartão SD");
         return;
     }
-    if(file.print(message)){
-        OnDebug(Serial.println(" - Nova linha salva com sucesso.");)
+
+
+    
+    if (file.print(message)) {
+        Serial.println(" - Nova linha salva com sucesso.");
     } else {
-        OnDebug(Serial.println(" - Falha ao salvar nova linha");)
+        Serial.println(" - Falha ao salvar nova linha");
     }
+    
     file.close();
 }
 
 // Mover isso daqui para um caso de uso
 void storeMeasurement(String directory, String fileName, const char *payload){
   String path = directory + "/" + fileName + ".txt";
+
   if (!SD.exists(directory)) {
     if (SD.mkdir(directory)) {
       OnDebug(Serial.println(" - Diretorio criado com sucesso!");)
+
     } else {
       OnDebug(Serial.println(" - Falha ao criar diretorio de metricas.");)
     }
   }
+  if (!SD.exists(path)) {
+      const char* header = "timestamp,temperatura,umidade_ar,velocidade_vento,rajada_vento,dir_vento,volume_chuva,pressao,uid,identidade\n";
+      appendFile(SD, path.c_str(), header);
+    }
   appendFile(SD, path.c_str(), payload);
 }
 
