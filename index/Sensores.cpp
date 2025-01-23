@@ -5,6 +5,10 @@
 #include <Adafruit_BMP085.h>
 #include <cfloat>
 
+#define periodMax 2000
+unsigned int Periods[periodMax]{~0};
+int periodIndex = 0;
+
 //Temperatura e Humidade
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -62,6 +66,8 @@ void anemometerChange() {
   unsigned long currentMillis = millis();
   unsigned long deltaTime = currentMillis - lastVVTImpulseTime;
   if (deltaTime >= DEBOUNCE_DELAY) {
+    Periods[(periodIndex++)]=deltaTime;
+    periodIndex =periodMax%2000;
     smallestDeltatime = min(deltaTime, smallestDeltatime);
     anemometerCounter++;
     lastVVTImpulseTime = currentMillis;
@@ -100,4 +106,40 @@ void BMPRead(float& press)
   }else{
     beginBMP();
   }
+}
+
+
+float find_index_sum_and_distance(unsigned int *data_array, int size) {
+  Serial.print("Size: ");Serial.println(size);
+    int min_index = 0;
+    for (int i = 1; i < size; ++i) {
+        if (data_array[i] < data_array[min_index]) {
+            min_index = i;
+        }
+    }
+    printf("Index of the minimum element: %d\n", min_index);
+    int total_sum = data_array[min_index];
+    int left_index = min_index - 1;
+    int right_index = min_index + 1;
+    int result = 0;
+    int distance = 1;
+
+    while (total_sum < 2000 && (left_index >= 0 || right_index < size)) {
+        if (left_index >= 0) {
+            total_sum += data_array[left_index];
+            result += 1.0 / data_array[left_index];
+            distance += 1;
+            --left_index;
+        }
+
+        if (right_index < size) {
+            total_sum += data_array[right_index];
+            result += 1.0 / data_array[right_index];
+            ++right_index;
+            ++distance;
+        }
+    }
+
+    return  (float)distance / (float)total_sum;
+
 }

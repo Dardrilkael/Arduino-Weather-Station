@@ -1,6 +1,6 @@
 // Autor: Lucas Fonseca e Gabriel Fonseca
 // Titulo: Sit arduino
-// Versão: 1.6.5 (BlueTooth BLE);
+// Versão: 1.6.6 Watch-dog;
 //.........................................................................................................................
 
 #include "constants.h"
@@ -13,7 +13,10 @@
 #include "bt-integration.h"
 #include <string>
 #include <vector>
-#include <esp_task_wdt.h>
+#include <rtc_wdt.h>
+
+// -- WATCH-DOG
+#define WDT_TIMEOUT 100000   
 
 // Pluviometro
 extern unsigned long lastPVLImpulseTime;
@@ -23,16 +26,20 @@ extern unsigned int rainCounter;
 extern unsigned long lastVVTImpulseTime;
 extern float anemometerCounter;
 extern unsigned long smallestDeltatime;
-
+extern unsigned int * Periods;
+extern int periodIndex;
 // Sensors
 extern Sensors sensors;
+
+
+
 
 // globals
 long startTime;
 int timeRemaining=0;
 std::string jsonConfig;
 String formatedDateString = "";
-struct HealthCheck healthCheck = {"1.6", 0, false, false, 0, 0};
+struct HealthCheck healthCheck = {"1.6.6", 0, false, false, 0, 0};
 
 void logIt(const std::string &message, bool store = false){
   Serial.print(message.c_str());
@@ -41,10 +48,27 @@ void logIt(const std::string &message, bool store = false){
   }
 }
 
+void watchdogRTC()
+{
+    rtc_wdt_protect_off();      //Disable RTC WDT write protection
+    rtc_wdt_disable();
+    rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
+    rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT); // timeout rtd_wdt 10000ms.
+    
+    rtc_wdt_enable();           //Start the RTC WDT timer
+    rtc_wdt_protect_on();       //Enable RTC WDT write protection
+}
+
 void setup() {
   delay(3000);
-  Serial.begin(115200);
   logIt("\n >> Sistema Integrado de meteorologia << \n");
+  pinMode(LED1,OUTPUT);
+  pinMode(LED2,OUTPUT);
+  pinMode(LED3,OUTPUT);
+  digitalWrite(LED1,HIGH);
+  digitalWrite(LED2,LOW);
+  digitalWrite(LED3,LOW);
+  Serial.begin(115200);
 
   pinMode(PLV_PIN, INPUT_PULLDOWN);
   pinMode(ANEMOMETER_PIN, INPUT_PULLUP);
@@ -53,7 +77,10 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), anemometerChange, FALLING);
 
   logIt("\nIniciando cartão SD");
+  
+
   initSdCard();
+  
 
   logIt("\nCriando diretorios padrões");
   createDirectory("/metricas");
@@ -93,15 +120,24 @@ void setup() {
   String dataHora = String(formatedDateString) + "T" + timeClient.getFormattedTime();
   storeLog(("\n" + dataHora + "\n").c_str());
 
+  // -- WATCH-DOG
+  watchdogRTC();
 
+  //Yellow Blink
+  for(int i=0; i<7; i++) {
+    digitalWrite(LED1,i%2);
+    delay(400);
+  }
 
-    esp_task_wdt_init(100, true);
-    // Enable the watchdog timer for the main task
-    esp_task_wdt_add(NULL);
+  startTime = millis();
 }
 
 void loop() {
-  startTime = millis();
+  digitalWrite(LED3,HIGH);
+
+  // -- WATCH-DOG
+  rtc_wdt_feed();
+  // -- WATCH-DOG
 
   timeClient.update();
   int timestamp = timeClient.getEpochTime();
@@ -111,6 +147,8 @@ void loop() {
   rainCounter = 0;
   anemometerCounter = 0;
   smallestDeltatime = 4294967295;
+  periodIndex=0;
+  //memset(Periods,~0,2000*sizeof(unsigned int));
 
   do {
     timeRemaining = startTime + config.interval - millis();
@@ -138,14 +176,15 @@ void loop() {
 
     // Garantindo Tempo ocioso para captação de metricas 60s
   } while (timeRemaining > 0);
-
+  startTime = millis();
   // Computando dados
   Serial.printf("\n\n Computando dados ...\n");
 
   Data.timestamp = timestamp;
   Data.wind_dir = getWindDir();
   Data.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
-  Data.wind_gust = (3052.0f * ANEMOMETER_CIRC) / smallestDeltatime;
+  Data.wind_gust = (3052.0f * ANEMOMETER_CIRC) * find_index_sum_and_distance(Periods, periodIndex%2000);
+  
   Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (INTERVAL / 1000.0); // m/s
   
   DHTRead(Data.humidity, Data.temperature);
@@ -167,7 +206,6 @@ void loop() {
   // Update metrics advertsting value
   BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
   Serial.printf("\n >> PROXIMA ITERAÇÃO\n");
-  esp_task_wdt_reset();
 }
 
 // callbacks
@@ -202,4 +240,3 @@ void convertTimeToLocaleDate(long timestamp) {
   int year = ptm->tm_year + 1900;
   formatedDateString = String(day) + "-" + String(month) + "-" + String(year);
 }
-

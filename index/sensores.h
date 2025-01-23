@@ -7,6 +7,8 @@ void pluviometerChange();
 void DHTRead(float& hum, float& temp);
 void BMPRead(float& press);
 void beginBMP();
+float find_index_sum_and_distance(unsigned int * data_array, int size);
+
 
 union  Sensors{
     struct {
