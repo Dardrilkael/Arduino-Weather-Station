@@ -1,6 +1,8 @@
 // Titulo: Integração HTTP & MQQT
 // Data: 30/07/2023
 //.........................................................................................................................
+#include "pch.h"
+
 
 #pragma once
 #include <WiFi.h> // #include <WiFiClientSecure.h>
@@ -26,10 +28,9 @@ char msg[MSG_BUFFER_SIZE];
 
 /***** WIFI ****/
 
-int setupWifi(const char *contextName, const char* ssid, const char*password)
+int setupWifi(const char *contextName, char* ssid, char*password)
 {
-  Serial.printf("%s: Estabelecendo conexão inicial\n %s %s", contextName,ssid,password);
-  
+  OnDebug(Serial.printf("%s: Estabelecendo conexão inicial", contextName);)
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   WiFi.setAutoReconnect(true);
@@ -40,12 +41,10 @@ int setupWifi(const char *contextName, const char* ssid, const char*password)
     digitalWrite(LED2,i%2);
     delay(200);}
       Serial.print(".");
-      //delete
-      //break;
   }
   
-  Serial.printf("\n%s: Contectado com sucesso \n", contextName);
-  Serial.printf("%s: IP address = %s \n", contextName, WiFi.localIP());
+  OnDebug(Serial.printf("\n%s: Contectado com sucesso \n", contextName);)
+  OnDebug(Serial.printf("%s: IP address = %s \n", contextName, WiFi.localIP());)
   return 1;
 }
 
@@ -53,19 +52,16 @@ int setupWifi(const char *contextName, const char* ssid, const char*password)
 /* Ntp Client */
 int connectNtp(const char *contextName)
 {
-  Serial.printf("%s: Estabelecendo conexão inicial\n", contextName);
+  OnDebug(Serial.printf("%s: Estabelecendo conexão inicial\n", contextName);)
 
   timeClient.begin();
 
   while(!timeClient.update()) {
     Serial.print(".");
     delay(1000);
-    //delete
-      //break;
-
   }
 
-  Serial.printf("%s: Conectado com sucesso. \n", contextName);
+  OnDebug(Serial.printf("%s: Conectado com sucesso. \n", contextName);)
   return 1;
 }
 

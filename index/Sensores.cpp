@@ -4,7 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <cfloat>
-
+#include "pch.h"
 //Temperatura e Humidade
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -22,7 +22,7 @@ unsigned long smallestDeltatime=4294967295;
 unsigned int gustIndex = 0;  
 unsigned int previousCounter= 0;
 Sensors sensors;
-int rps[60]{0};
+int rps[20]{0};
 
 void resetSensors(){
   rainCounter = 0;
@@ -35,11 +35,11 @@ void resetSensors(){
 
 void setupSensors(){
   // Inciando DHT
-  Serial.println("Iniciando DHT");
+  OnDebug(Serial.println("Iniciando DHT");)
   dht.begin();
 
   // Iniciando BMP
-  Serial.println('Iniciando BMP ');
+  OnDebug(Serial.println('Iniciando BMP ');)
   beginBMP();
 }
 
@@ -47,7 +47,7 @@ void beginBMP()
 {
   sensors.bits.bmp= bmp.begin();
   if (!sensors.bits.bmp) {
-    Serial.println("Could not find a valid BMP180 sensor, check wiring!");
+    OnDebug(Serial.println("Could not find a valid BMP180 sensor, check wiring!");)
   }
 }
 
@@ -91,9 +91,9 @@ void pluviometerChange() {
 void DHTRead(float& hum, float& temp) {
   hum = dht.readHumidity();        // umidade relativa
   temp = dht.readTemperature();  //  temperatura em graus Celsius
-  if (isnan(hum) || isnan(temp)){
-    Serial.println("Falha ao ler o sensor DHT!");
-  }
+ OnDebug( if (isnan(hum) || isnan(temp)){
+    OnDebug(Serial.println("Falha ao ler o sensor DHT!");)
+  })
 }
 
 //Pressao
@@ -103,7 +103,7 @@ void BMPRead(float& press)
     // float temperature = bmp.readTemperature(); // isnan(temperature)
     float pressure = bmp.readPressure() / 100.0; // Convert Pa to hPa
     if (isnan(pressure)) {
-      Serial.println("Falha ao ler o sensor BMP180!");
+      OnDebug(Serial.println("Falha ao ler o sensor BMP180!");)
       press = -1;
       return;
     }
@@ -113,20 +113,18 @@ void BMPRead(float& press)
   }
 }
 
-
-
 void WindGustRead(unsigned int now)
 {
   static unsigned int lastAssignement = 0;
 
   int gustInterval = now-lastAssignement;
-    if(gustInterval>=1000)
+    if(gustInterval>=3000)
     {
       lastAssignement= now;
       int revolutions = anemometerCounter- previousCounter;
       previousCounter=anemometerCounter;
       rps[gustIndex++] = revolutions;
-      gustIndex = gustIndex%(sizeof(rps)/sizeof(int));
+      gustIndex = gustIndex%20;
     }
 }
 void windGustReset(){gustIndex=0;  previousCounter = 0;}
@@ -144,27 +142,3 @@ int findMax(int arr[], int size) {
     }
     return max;
 }
-
-float gust(const int* data, int size, int width)
-{
-	const int* begin = data;
-
-	float maxSum = 0.0f;
-
-	do
-	{
-		float sum = 0.0f;
-		for (const int* ptr = begin; ptr < begin + width; ptr++)
-		{
-			sum += *ptr;
-		}
-
-		if (sum > maxSum)
-			maxSum = sum;
-
-		begin++;
-	} while (begin + width <= data + size);
-
-	return maxSum;
-}
-

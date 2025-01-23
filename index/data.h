@@ -1,7 +1,7 @@
 #pragma once
 // --- Config data  ---
 struct Config {
-    char station_uid[64]{0};
+    char station_uid[32]{0};
     char station_name[64]{0};
     char wifi_ssid[64]{0};
     char wifi_password[64]{0};
@@ -9,32 +9,13 @@ struct Config {
     char mqtt_username[64]{0};
     char mqtt_password[64]{0};
     char mqtt_topic[64]{0};
-    //---------------//
     char mqtt_hostV2_server[64]{0};
     char mqtt_hostV2_username[64]{0};
     char mqtt_hostV2_password[64]{0};
     int mqtt_hostV2_port;
-    //----------------/
-    //char iotGatewayHost[64];
     int mqtt_port;
     int interval;
 };
-void printConfig(const Config& config) {
-    Serial.println("Station UID: " + String(config.station_uid));
-    Serial.println("Station Name: " + String(config.station_name));
-    Serial.println("WiFi SSID: " + String(config.wifi_ssid));
-    Serial.println("WiFi Password: " + String(config.wifi_password));
-    Serial.println("MQTT Server: " + String(config.mqtt_server));
-    Serial.println("MQTT Username: " + String(config.mqtt_username));
-    Serial.println("MQTT Password: " + String(config.mqtt_password));
-    Serial.println("MQTT Topic: " + String(config.mqtt_topic));
-    Serial.println("MQTT HostV2 Server: " + String(config.mqtt_hostV2_server));
-    Serial.println("MQTT HostV2 Username: " + String(config.mqtt_hostV2_username));
-    Serial.println("MQTT HostV2 Password: " + String(config.mqtt_hostV2_password));
-    Serial.println("MQTT HostV2 Port: " + String(config.mqtt_hostV2_port));
-    Serial.println("MQTT Port: " + String(config.mqtt_port));
-    Serial.println("Interval: " + String(config.interval));
-}
 
 struct Config config;
 const char *configFileName = "/config.txt";

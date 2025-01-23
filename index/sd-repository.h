@@ -1,13 +1,12 @@
+#include "xtensa/hal.h"
+#pragma once
+#include "pch.h"
 #include <SD.h>
 #include <sd_defines.h>
 #include <sd_diskio.h>
-
-#pragma once
-
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
-
 #include <ArduinoJson.h>
 
 const int chipSelectPin = 32;
@@ -21,176 +20,179 @@ void SD_BLINK(int interval)
   for(int i=0; i<interval/500;i++){
     digitalWrite(LED2,i%2);
     delay(500+((i%2==0) && (i%3>0))*1000);
-}
+  }
 }
 
 // Inicia leitura cartão SD
 void initSdCard(){
   SPI.begin(clockPin, misoPin, mosiPin);
   while(!SD.begin(chipSelectPin, SPI)) {
-    Serial.printf("\n  - Cartão não encontrado. tentando novamente em %d segundos ...", 2);
+    OnDebug(Serial.printf("\n  - Cartão não encontrado. tentando novamente em %d segundos ...", 2);)
     SD_BLINK(2000);}
-
-  Serial.printf("\n  - Leitor de Cartão iniciado com sucesso!.\n");
+  OnDebug(Serial.printf("\n  - Leitor de Cartão iniciado com sucesso!.\n");)
 }
 
 // Adicionar novo diretorio
 void createDirectory(const char * directory){
-  Serial.printf("\n  - Tentando Criando novo diretorio: %s.", directory);
+  OnDebug(Serial.printf("\n  - Tentando Criando novo diretorio: %s.", directory);)
   if (!SD.exists(directory)) {
     if (SD.mkdir(directory)) {
-      Serial.printf("\n     - Diretorio criado com sucesso!");
+      OnDebug(Serial.printf("\n     - Diretorio criado com sucesso!");)
     } else {
-      Serial.printf("\n     - Falha ao criar diretorio.");
+      OnDebug(Serial.printf("\n     - Falha ao criar diretorio.");)
     }
     return;
   }
-  Serial.printf("\n     - Diretorio já existe.");
+  OnDebug(Serial.printf("\n     - Diretorio já existe.");)
+}
+
+// Parse Mqtt connection string
+void parseMQTTString(const char *mqttString, char *username, char *password, char *broker, int &port) {
+  if (memcmp(mqttString, "mqtt://", 7) != 0) {
+    printf("Invalid MQTT string format!\n");
+    return;
+  }
+  int size = strlen(mqttString)+1;
+  char *ptr = new char[size-7];   
+  strlcpy(ptr,mqttString+7,size-7);
+  strlcpy(username, strtok(ptr, ":"), 64);
+  strlcpy(password, strtok(NULL, "@"), 64);
+  strlcpy(broker, strtok(NULL, ":"), 64);
+  port =  atoi(strtok(NULL, ""));
+  delete[] ptr;
+}
+
+// Parse Wifi connection string
+void parseWIFIString(const char *wifiString, char *ssid, char *password) {
+  int size = strlen(wifiString)+1;
+  char *ptr = new char[size];
+  strlcpy(ptr,wifiString,size);
+  strlcpy(ssid, strtok(ptr, ":"), 64);
+  strlcpy(password, strtok(NULL, ""), 64);
+  delete[] ptr;
 }
 
 // Carrega arquivo de configuração inicial
-void loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::string& configJson) {
-  Serial.printf("\n - Carregando variáveis de ambiente");
+bool loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::string& configJson) {
 
   SPI.begin(clockPin, misoPin, mosiPin);
 
-  int attemptCount = 0;
+  static int attemptCount = 0;
   bool success = false;
-  while (success == false) {
-
-    Serial.printf("\n - Iniciando leitura do arquivo de configuração %s (tentativa: %d)", filename, attemptCount + 1);
-
-    if (SD.begin(chipSelectPin, SPI)){
-      File file = fs.open(filename);
-      StaticJsonDocument<512> doc;
-      char mqqtHostV[128]{0};
-      if (file){
-        DeserializationError error = deserializeJson(doc, file);
-        if (!error){
-          strlcpy(config.station_uid, doc["UID"] | "", sizeof(config.station_uid));
-          strlcpy(config.station_name, doc["SLUG"] | "", sizeof(config.station_name));
-          strlcpy(config.wifi_ssid, doc["WIFI_SSID"] | "", sizeof(config.wifi_ssid));
-          strlcpy(config.wifi_password, doc["WIFI_PASSWORD"] | "", sizeof(config.wifi_password));
-          config.interval = doc["INTERVAL"] | 60000;
-
-          strlcpy(mqqtHostV, doc["MQTT_HOST_V1"] | "", sizeof(mqqtHostV));
-          //mqtt://telemetria:kancvx8thz9FCN5jyq@broker.gpicm-ufrj.tec.br:1883
-          strlcpy(config.mqtt_username, strtok(mqqtHostV+7, ":"), sizeof(config.mqtt_username));
-          strlcpy(config.mqtt_password, strtok(NULL, "@"), sizeof(config.mqtt_password));
-          strlcpy(config.mqtt_server, strtok(NULL, ":"), sizeof(config.mqtt_server));
-          config.mqtt_port =  atoi(strtok(NULL, ""));
-          strlcpy(config.mqtt_topic, doc["MQTT_TOPIC"] | "", sizeof(config.mqtt_topic));
-
-          //strlcpy(config.mqtt_username, doc["MQTT_USERNAME"] | "", sizeof(config.mqtt_username));
-          //strlcpy(config.mqtt_password, doc["MQTT_PASSWORD"] | "", sizeof(config.mqtt_password));
-          //config.mqtt_port = doc["MQTT_PORT"] | 1883;
-          memset(mqqtHostV,0,sizeof(mqqtHostV));
-          strlcpy(mqqtHostV, doc["MQTT_HOST_V2"] | "", sizeof(mqqtHostV));
-          strlcpy(config.mqtt_hostV2_username, strtok(mqqtHostV+7, ":"), sizeof(config.mqtt_hostV2_username));
-          strlcpy(config.mqtt_hostV2_password, strtok(NULL, "@"), sizeof(config.mqtt_hostV2_password));
-          strlcpy(config.mqtt_hostV2_server, strtok(NULL, ":"), sizeof(config.mqtt_hostV2_server));
-          config.mqtt_hostV2_port =  atoi(strtok(NULL, ""));
-
-          //strlcpy(config.mqtt_hostV2_server, doc["MQTT_HOSTV2_SERVER"] | "", sizeof(config.mqtt_hostV2_server));
-          //strlcpy(config.mqtt_hostV2_username, doc["MQTT_HOSTV2_USERNAME"] | "", sizeof(config.mqtt_hostV2_username));
-          //strlcpy(config.mqtt_hostV2_password, doc["MQTT_HOSTV2_PASSWORD"] | "", sizeof(config.mqtt_hostV2_password));
-          //config.mqtt_hostV2_port = doc["MQTT_HOSTV2_PORT"] | 1884;
-          //config.mqtt_host_server, config.mqtt_host_port, config.mqtt_host_username, config.mqtt_host_password,
-          //strlcpy(config.iotGatewayHost, doc["IOTGATEWAYHOST"] | "", sizeof(config.iotGatewayHost));
-          file.close();
-          success = true;
-          serializeJson(doc, configJson);
-          continue;
-        }
-        Serial.printf("\n - [ ERROR ] Formato inválido (JSON)\n");
-        Serial.println(error.c_str());
+  Serial.printf("\n - Iniciando leitura do arquivo de configuração %s (tentativa: %d)", filename, attemptCount + 1);
+  if (SD.begin(chipSelectPin, SPI)){
+    File file = fs.open(filename);
+    StaticJsonDocument<512> doc;
+    if (file){
+      DeserializationError error = deserializeJson(doc, file);
+      if (!error){
+        strlcpy(config.station_uid, doc["UID"] | "0", sizeof(config.station_uid));
+        strlcpy(config.station_name, doc["SLUG"] | "est000", sizeof(config.station_name));
+        strlcpy(config.mqtt_topic, doc["MQTT_TOPIC"] | "unnamed", sizeof(config.mqtt_topic));
+        config.interval = doc["INTERVAL"] | 60000;
+        parseWIFIString(doc["WIFI"],config.wifi_ssid,config.wifi_password);
+        parseMQTTString(doc["MQTT_HOST"],config.mqtt_username,config.mqtt_password,config.mqtt_server,config.mqtt_port);
+        parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
+        file.close();
+        success = true;
+        serializeJson(doc, configJson);
+        Serial.printf("\n - Variáveis de ambiente carregadas com sucesso!");
+        Serial.printf("\n - %s\n", configJson.c_str());
+        return true;
       }
-      Serial.printf("\n - [ ERROR ] Arquivo de configuração não encontrado\n");
-    } else {
-      Serial.printf("\n - [ ERROR ] Cartão SD não encontrado.\n");
+      Serial.printf("\n - [ ERROR ] Formato inválido (JSON)\n");
+      Serial.println(error.c_str());
     }
-
-    Serial.printf("\n - Proxima tentativa de re-leitura em %d segundos ... \n\n\n", (RETRY_INTERVAL / 1000));
-    attemptCount++;
-    SD_BLINK(RETRY_INTERVAL);
-
+    Serial.printf("\n - [ ERROR ] Arquivo de configuração não encontrado\n");
+  } else {
+    Serial.printf("\n - [ ERROR ] Cartão SD não encontrado.\n");
   }
 
-  Serial.printf("\n - Variáveis de ambiente carregadas com sucesso!");
-  Serial.printf("\n - %s", configJson.c_str());
-  Serial.println();
-  return;
+  Serial.printf("\n - Proxima tentativa de re-leitura em %d segundos ... \n\n\n", (RETRY_INTERVAL / 1000));
+  attemptCount++;
+  SD_BLINK(RETRY_INTERVAL);
+  return false;
 }
 
+// Cria um novo arquivo
 void createFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Salvando json no cartao SD: %s\n.", path); 
+    OnDebug(Serial.printf("Salvando json no cartao SD: %s\n.", path); )
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
-        Serial.println(" - Falha ao encontrar cartão SD.");
+        OnDebug(Serial.println(" - Falha ao encontrar cartão SD.");)
         return;
     }
     if(file.print(message)){
-        Serial.println(" - sucesso.");
+        OnDebug(Serial.println(" - sucesso.");)
     } else {
-        Serial.println("- Falha ao salvar.");
+        OnDebug(Serial.println("- Falha ao salvar.");)
     }
     file.close();
 }
 
+// Escreve em arquivo
 void appendFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf(" - Salvando dados no cartao SD: %s\n", path); 
+    OnDebug(Serial.printf(" - Salvando dados no cartao SD: %s\n", path); )
 
     File file = fs.open(path, FILE_APPEND);
     if(!file){
-        Serial.println(" - Falha ao encontrar cartão SD");
+        OnDebug(Serial.println(" - Falha ao encontrar cartão SD");)
         return;
     }
     if(file.print(message)){
-        Serial.println(" - Nova linha salva com sucesso.");
+        OnDebug(Serial.println(" - Nova linha salva com sucesso.");)
     } else {
-        Serial.println(" - Falha ao salvar nova linha");
+        OnDebug(Serial.println(" - Falha ao salvar nova linha");)
     }
     file.close();
 }
 
-
+// Mover isso daqui para um caso de uso
 void storeMeasurement(String directory, String fileName, const char *payload){
   String path = directory + "/" + fileName + ".txt";
   if (!SD.exists(directory)) {
     if (SD.mkdir(directory)) {
-      Serial.println(" - Diretorio criado com sucesso!");
+      OnDebug(Serial.println(" - Diretorio criado com sucesso!");)
     } else {
-      Serial.println(" - Falha ao criar diretorio de metricas.");
+      OnDebug(Serial.println(" - Falha ao criar diretorio de metricas.");)
     }
   }
   appendFile(SD, path.c_str(), payload);
 }
 
 
-// Adicion uma nova linha de metricas
+#define BUFFER_SIZE 512
+char buffer[BUFFER_SIZE];
+
+
+const char* listDirectory(File& dir, size_t limit) {
+  buffer[0] = '\0'; // Clear buffer at the beginning of each function call
+  size_t writtenLength = 0; // Initialize writtenLength to 0
+
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) break;
+
+    size_t entryNameLength = strlen(entry.name());
+    if (writtenLength + entryNameLength + 2 > limit) {
+      dir.seek(dir.position() - entryNameLength); // Move back the file pointer
+      return buffer; // Return the directory list buffer
+    }
+
+    strcat(buffer, entry.name()); // Append entry name to buffer
+    strcat(buffer, "\n"); // Append newline character
+    entry.close();
+
+    writtenLength += entryNameLength + 1; // Update writtenLength to include the entry name and newline character
+  }
+  return buffer; // Return the directory list buffer
+}
+
+// Adiciona uma nova linha de metricas
 void storeLog(const char *payload){
   String path = "/logs/boot.txt";
   File file = SD.open(path, FILE_APPEND);
   if (file) { file.print(payload); }
   file.close();
 } 
-
-void readFileToCharArray(const char* filename, char* content, size_t maxLength) {
-  // Open the file
-  File file = SD.open(filename);
-  if (!file) {
-    Serial.println("Failed to open file.");
-    return;
-  }
-
-  // Read the file into the character array
-  size_t index = 0;
-  while (file.available() && index < maxLength - 1) {
-    content[index++] = (char)file.read();
-  }
-  content[index] = '\0'; // Null-terminate the character array
-
-  // Close the file
-  file.close();
-}
