@@ -284,7 +284,8 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
         }
     } else {
       
-        size_t fileSize = file.size();
+        size_t fileSize = file.size()
+        //TODO change chunkzise acoording to the filepath length
         size_t chunkSize = 256;
         size_t totalChunks = (fileSize + chunkSize - 1) / chunkSize;
         size_t chunkNum = 0;
@@ -311,7 +312,7 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
             chunkNum++;
         }
         file.close();
-        StaticJsonDocument<128> completeMessage;
+        /*StaticJsonDocument<128> completeMessage;
         completeMessage["type"] = "file";
         completeMessage["filename"] = path;
         completeMessage["chunk"] = 0; // 0 indicates completion
@@ -323,7 +324,7 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
         char completeBuffer[128];
         serializeJson(completeMessage, completeBuffer);
         mqqtClient1.publish(fileMqqtTopic, completeBuffer);
-
+*/
 
     }
 }
