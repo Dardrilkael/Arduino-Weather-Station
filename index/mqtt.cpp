@@ -1,6 +1,5 @@
 #include "mqtt.h"
-#include <PubSubClient.h>
-#include <WiFi.h>
+
 #include "pch.h"
   MQTT::MQTT()
   {

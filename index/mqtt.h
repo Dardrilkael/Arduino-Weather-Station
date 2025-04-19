@@ -1,5 +1,6 @@
 #pragma once
-
+#include <PubSubClient.h>
+#include <WiFi.h>
 void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length);
 class MQTT
 {
@@ -18,6 +19,6 @@ int endPublish();
 int write(char);
 int write(const unsigned char *buffer, int size);
 private:
-class WiFiClient* m_WifiClient;
-class PubSubClient* m_Client;
+WiFiClient* m_WifiClient;
+PubSubClient* m_Client;
 };

@@ -2,7 +2,7 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include "pch.h"
-
+#include <WiFi.h> 
 bool OTA::update(const String& url) {
     Serial.println("Starting firmware update...");
 

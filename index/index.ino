@@ -154,6 +154,15 @@ void setup() {
 }
 int timestamp = 0;
 void loop() {
+  if (Serial.available()) {
+    char input = Serial.read();
+    if (input == 'r' || input == 'R') {
+      Serial.println("🔄 Reiniciando dispositivo...");
+      delay(1000);
+      ESP.restart();
+    }
+  }
+
   digitalWrite(LED3,HIGH);
   unsigned long now = millis();
   WindGustRead(now);
@@ -284,7 +293,7 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
         }
     } else {
       
-        size_t fileSize = file.size()
+        size_t fileSize = file.size();
         //TODO change chunkzise acoording to the filepath length
         size_t chunkSize = 256;
         size_t totalChunks = (fileSize + chunkSize - 1) / chunkSize;

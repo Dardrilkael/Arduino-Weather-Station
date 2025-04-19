@@ -28,7 +28,7 @@ class ServerCallbacks : public BLEServerCallbacks {
 
 class CharacteristicsCallback : public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
-        std::string rxValue = pCharacteristic->getValue();
+        std::string rxValue = std::string(pCharacteristic->getValue().c_str());
         const char *characteristicUid = pCharacteristic->getUUID().toString().c_str();
         if (rxValue.empty() || !characteristicCB) return;
         characteristicCB(characteristicUid, rxValue);
@@ -86,10 +86,10 @@ void BLE::updateValue(const char *characteristicId, const std::string &newValue)
     if (newValue.length() == 0) return;
     std::cout << "\n  - Emitindo valores via Bluetooth (" << newValue << ") \n";
     if(characteristicId == HEALTH_CHECK_UUID){
-        pHealthCharacteristic->setValue(newValue);
+        pHealthCharacteristic->setValue((newValue.c_str()));
         pHealthCharacteristic->notify();
     }else if(characteristicId == CONFIGURATION_UUID) {
-        pConfigCharacteristic->setValue(newValue);
+        pConfigCharacteristic->setValue((newValue.c_str()));
         pConfigCharacteristic->notify();
     } else {
         std::cout << "Characteristica não encontrada.\n";

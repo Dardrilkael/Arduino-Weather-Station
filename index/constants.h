@@ -10,9 +10,9 @@
 #define PLV_PIN 5
 #define VANE_PIN 36
 #define DHTTYPE DHT22       // Define o tipo de sensor (DHT11 ou DHT22)
+#define LED1 12 // Yellow
+#define LED2 2 // Red
 #define LED3 33 // Green
-#define LED1 26 // Yellow
-#define LED2 14 // Red
 
 
 // Anemometro (Velocidade do vento)
