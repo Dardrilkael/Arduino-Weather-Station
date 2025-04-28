@@ -21,7 +21,9 @@
 #include <Base64.h>
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
-
+bool sendCSVFile(File&);
+bool renameFile(File&);
+bool processFiles(const char* dirPath, bool (*function[])(File&), int nOf, int amount = 1);
 extern unsigned long lastPVLImpulseTime; 
 extern unsigned int rainCounter;
 extern unsigned long lastVVTImpulseTime;
@@ -29,7 +31,7 @@ extern float anemometerCounter;
 extern int rps[20];
 extern Sensors sensors;
 long startTime;
-long startTime5_Seconds;
+long startTime5_Seconds, startTime_20m;
 long startTime100_mS;
 int timeRemaining=0;
 std::string jsonConfig = "{}";
@@ -44,6 +46,7 @@ MQTT mqqtClient1;
 // -- Novo
 int wifiDisconnectCount=0;
 
+bool (*functions[])(File&) = { sendCSVFile , renameFile};
 void logIt(const std::string &message, bool store = false){
   Serial.print(message.c_str());
   if(store == true){
@@ -151,7 +154,11 @@ void setup() {
   startTime = millis();
   startTime5_Seconds=startTime;
   startTime100_mS=startTime;
+  startTime_20m = startTime;
+  //sendCSVFile("/config.txt");
+
 }
+
 int timestamp = 0;
 void loop() {
   if (Serial.available()) {
@@ -174,6 +181,10 @@ void loop() {
   digitalWrite(LED1,LOW);
   digitalWrite(LED2,LOW);
   now = millis();
+   if (now-startTime_20m >= 50){
+    startTime_20m = now;
+    processFiles("/falhas",functions,sizeof(functions) / sizeof(functions[0]));
+   }
   if (now-startTime >= config.interval){
     startTime = now;
 
