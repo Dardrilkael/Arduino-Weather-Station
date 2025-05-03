@@ -9,9 +9,9 @@ struct Config {
     char mqtt_username[64]{0};
     char mqtt_password[64]{0};
     char mqtt_topic[64]{0};
-    char mqtt_hostV2_server[64]{0};
-    char mqtt_hostV2_username[64]{0};
-    char mqtt_hostV2_password[64]{0};
+    //char mqtt_hostV2_server[64]{0};
+    //char mqtt_hostV2_username[64]{0};
+    //char mqtt_hostV2_password[64]{0};
     int mqtt_hostV2_port;
     int mqtt_port;
     int interval;
@@ -42,7 +42,7 @@ const char *parseHealthCheckData(HealthCheck hc, int type = 1) {
             hc.isMqttConnected ? 1 : 0,
             hc.wifiDbmLevel,
             hc.timestamp,
-            hc.timeRemaining);
+            hc.timeRemaining);   
     return hcCsvOutput;
   } else {
     const char *json_template = "{\"isWifiConnected\": %d, \"isMqttConnected\": %d, \"wifiDbmLevel\": %i, \"timestamp\": %i}";
