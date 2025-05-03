@@ -1,0 +1,17 @@
+node_modules/
+temp/
+.vscode
+.env
+
+dist/
+
+__vm/
+
+**/build/
+.bin
+
+arduino/index/.theia/
+arduino/index/OTA.cpp.bak
+arduino/index/index.ino.bak
+arduino/index/mqtt.cpp.bak
+arduino/index/mqtt.h.bak

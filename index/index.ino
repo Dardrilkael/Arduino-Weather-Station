@@ -21,9 +21,8 @@
 #include <Base64.h>
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
-bool sendCSVFile(File&);
-bool renameFile(File&);
-bool processFiles(const char* dirPath, bool (*function[])(File&), int nOf, int amount = 1);
+
+bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1);
 extern unsigned long lastPVLImpulseTime; 
 extern unsigned int rainCounter;
 extern unsigned long lastVVTImpulseTime;
@@ -46,7 +45,6 @@ MQTT mqqtClient1;
 // -- Novo
 int wifiDisconnectCount=0;
 
-bool (*functions[])(File&) = { sendCSVFile , renameFile};
 void logIt(const std::string &message, bool store = false){
   Serial.print(message.c_str());
   if(store == true){
@@ -180,10 +178,10 @@ void loop() {
 
   digitalWrite(LED1,LOW);
   digitalWrite(LED2,LOW);
-  now = millis();
-   if (now-startTime_20m >= 45000){
+
+   if (now-startTime_20m >= 40000){
     startTime_20m = now;
-    processFiles("/falhas",functions,sizeof(functions) / sizeof(functions[0]));
+    processFiles("/falhas",formatedDateString.c_str());
    }
   if (now-startTime >= config.interval){
     startTime = now;
@@ -332,7 +330,7 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
             chunkNum++;
         }
         file.close();
-        /*StaticJsonDocument<128> completeMessage;
+        StaticJsonDocument<128> completeMessage;
         completeMessage["type"] = "file";
         completeMessage["filename"] = path;
         completeMessage["chunk"] = 0; // 0 indicates completion
@@ -344,7 +342,6 @@ void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id)
         char completeBuffer[128];
         serializeJson(completeMessage, completeBuffer);
         mqqtClient1.publish(fileMqqtTopic, completeBuffer);
-*/
 
     }
 }

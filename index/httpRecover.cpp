@@ -9,20 +9,31 @@ const char* serverUrl = "http://192.168.0.225:3000/upload-csv"; // Altere para s
 const char* contentType = "text/csv"; // ou "application/octet-stream" se necessário
 
 
-bool renameFile(File& file) {
-    // Get the current name of the file
-    const char* currentName = file.name();
+bool renameFile(File& file, const char* path) {
+    String currentName = file.name();
 
-    // Attempt to rename the file
-    const char* newName = (String("@")+currentName).c_str();
-    if (SD.rename(currentName,newName )) {
-        Serial.printf("Arquivo renomeado de %s para %s\n", currentName, newName);
+    // Garante que o path termina com "/"
+    String basePath = String(path);
+    if (!basePath.endsWith("/")) {
+        basePath += "/";
+    }
+
+    // Constroi caminhos completos
+    String fullCurrentName = basePath + currentName;
+    String fullNewName = basePath + "@" + currentName;
+
+    file.close(); // Fecha antes de renomear
+
+    if (SD.rename(fullCurrentName.c_str(), fullNewName.c_str())) {
+        Serial.printf("Arquivo renomeado de %s para %s\n", fullCurrentName.c_str(), fullNewName.c_str());
         return true;
     } else {
-        Serial.printf("Falha ao renomear o arquivo %s para %s\n", currentName, newName);
+        Serial.printf("Falha ao renomear o arquivo %s para %s\n", fullCurrentName.c_str(), fullNewName.c_str());
         return false;
     }
 }
+
+
 
 
 // Envia um arquivo CSV via POST direto do cartão SD
@@ -45,7 +56,7 @@ bool sendCSVFile(File& file)
 
   http.addHeader("Content-Type", contentType);
   http.addHeader("Connection", "close");
-
+  http.addHeader("X-Filename",file.name()); 
   // Envio via stream
   int httpResponseCode = http.sendRequest("POST", &file, file.size());
 
@@ -53,11 +64,11 @@ bool sendCSVFile(File& file)
 
   http.end();
 
-  return httpResponseCode > 0 && httpResponseCode < 300;
+  return (httpResponseCode > 0 && httpResponseCode < 300);
 }
 
 
-bool processFiles(const char* dirPath, bool (*function[])(File&), int nOf, int amount = 1) {
+bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1) {
     File dir = SD.open(dirPath);
     if (!dir) {
         Serial.println("Falha ao abrir diretório.");
@@ -66,19 +77,31 @@ bool processFiles(const char* dirPath, bool (*function[])(File&), int nOf, int a
 
     bool success = true;
     int count = 0;
+
     while (File file = dir.openNextFile()) {
         if (!file.isDirectory()) {
-            Serial.printf("Processando arquivo: %s\n", file.name());
-            if(count++>=amount)return success;
-            
-            for (int i = 0; i < nOf; i++) {
-                if (!function[i](file)) {
-                    Serial.printf("Falha ao enviar o arquivo %s.\n", file.name());
-                    success = false;
-                    break;
-                }
+            String currentName = file.name();
+            Serial.printf("Processando arquivo: %s\n", currentName.c_str());
+
+            if (currentName.startsWith("@")) {
+                Serial.printf("Pulando renomeação, o arquivo %s já tem o prefixo '@'.\n", currentName.c_str());
+                file.close();
+                continue;
+            } else if (todayDateString && currentName == todayDateString) {
+                Serial.printf("Pulando data de hoje: %s\n", currentName.c_str());
+                file.close();
+                continue;
             }
-    
+
+            if (sendCSVFile(file)) {
+                renameFile(file, dirPath);
+            }
+
+            count++;
+            if (count >= amount) {
+                file.close();
+                break;
+            }
         }
         file.close();
     }
@@ -86,3 +109,4 @@ bool processFiles(const char* dirPath, bool (*function[])(File&), int nOf, int a
     dir.close();
     return success;
 }
+
