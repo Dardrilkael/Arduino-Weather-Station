@@ -181,7 +181,7 @@ void loop() {
   digitalWrite(LED1,LOW);
   digitalWrite(LED2,LOW);
   now = millis();
-   if (now-startTime_20m >= 50){
+   if (now-startTime_20m >= 45000){
     startTime_20m = now;
     processFiles("/falhas",functions,sizeof(functions) / sizeof(functions[0]));
    }
