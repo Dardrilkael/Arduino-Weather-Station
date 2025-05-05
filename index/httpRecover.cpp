@@ -5,7 +5,7 @@
 #include <SD.h>
 
 // Configurações
-const char* serverUrl = "http://192.168.0.225:3000/upload-csv"; // Altere para seu endpoint
+const char* serverUrl = "http://192.168.0.225:4500/failures/upload"; // Altere para seu endpoint
 const char* contentType = "text/csv"; // ou "application/octet-stream" se necessário
 
 
