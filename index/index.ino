@@ -32,7 +32,7 @@ extern Sensors sensors;
 long startTime;
 long startTime5_Seconds;
 unsigned long startTime_BACKUP;
-#define HTTP_BACKUP_INTERVAL 20000
+#define HTTP_BACKUP_INTERVAL 40000
 long startTime100_mS;
 int timeRemaining=0;
 std::string jsonConfig = "{}";
