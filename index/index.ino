@@ -30,7 +30,9 @@ extern float anemometerCounter;
 extern int rps[20];
 extern Sensors sensors;
 long startTime;
-long startTime5_Seconds, startTime_20m;
+long startTime5_Seconds;
+unsigned long startTime_BACKUP;
+#define HTTP_BACKUP_INTERVAL 20000
 long startTime100_mS;
 int timeRemaining=0;
 std::string jsonConfig = "{}";
@@ -148,13 +150,12 @@ void setup() {
   char jsonPayload[100];
   sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu}", FIRMWARE_VERSION, timestamp);
   mqqtClient1.publish((sysReportMqqtTopic + String("/handshake")).c_str(), jsonPayload, 1);
-  
+
   startTime = millis();
   startTime5_Seconds=startTime;
   startTime100_mS=startTime;
-  startTime_20m = startTime;
-  //sendCSVFile("/config.txt");
-
+  startTime_BACKUP = startTime;
+  startTime_BACKUP = millis() - HTTP_BACKUP_INTERVAL;
 }
 
 int timestamp = 0;
@@ -179,8 +180,8 @@ void loop() {
   digitalWrite(LED1,LOW);
   digitalWrite(LED2,LOW);
 
-   if (now-startTime_20m >= 40000){
-    startTime_20m = now;
+   if (now-startTime_BACKUP >= HTTP_BACKUP_INTERVAL){
+    startTime_BACKUP = now;
     processFiles("/falhas",formatedDateString.c_str());
    }
   if (now-startTime >= config.interval){
@@ -252,7 +253,7 @@ void loop() {
         mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
   
-    // Atualizando BLE advertsting value
+   // Atualizando BLE advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
   }
 
