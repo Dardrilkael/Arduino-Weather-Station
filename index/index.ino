@@ -252,7 +252,11 @@ void loop() {
       if(healthCheck.isMqttConnected)
         mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
-  
+    // Enviando dados de health check
+    char mqttHealthCheck[100];
+    sprintf(mqttHealthCheck, "{\"wifiDBM\":\"%i\"}", WiFi.RSSI());
+    mqqtClient1.publish((sysReportMqqtTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1);
+    
    // Atualizando BLE advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
   }
