@@ -169,6 +169,15 @@ void loop() {
     }
   }
 
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[WiFi] Conexão perdida. Tentando reconectar...");
+
+    WiFi.disconnect(); // Força desconexão
+    delay(1000);       // Espera um pouco
+
+    setupWifi("LOOP", config.wifi_ssid, config.wifi_password);
+  }
+
   digitalWrite(LED3,HIGH);
   unsigned long now = millis();
   WindGustRead(now);
