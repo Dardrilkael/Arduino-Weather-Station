@@ -17,7 +17,7 @@ bool OTA::update(const String& url) {
     // Send the request and check the response
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
-        Serial.printf("HTTPS GET failed: %s(%d)\n", http.errorToString(httpCode).c_str(),httpCode);
+        Serial.printf("HTTP GET failed: %s(%d)\n", http.errorToString(httpCode).c_str(),httpCode);
         http.end();
         return false;
     }
