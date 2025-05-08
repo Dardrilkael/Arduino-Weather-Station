@@ -87,7 +87,7 @@ bool processFiles(const char* dirPath, const char * todayDateString = nullptr, i
                 Serial.printf("Pulando renomeação, o arquivo %s já tem o prefixo '@'.\n", currentName.c_str());
                 file.close();
                 continue;
-            } else if (todayDateString && currentName == todayDateString) {
+            } else if (todayDateString && currentName == (todayDateString + String(".txt"))) {
                 Serial.printf("Pulando data de hoje: %s\n", currentName.c_str());
                 file.close();
                 continue;
