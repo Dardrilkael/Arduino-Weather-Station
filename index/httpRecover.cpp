@@ -3,9 +3,11 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <SD.h>
+#include "data.h"
 
 // Configurações
-const char* serverUrl = "http://metcolab.macae.ufrj.br/admin/failures/upload"; // Altere para seu endpoint
+const char* serverUrl = "   ";
+//const char* serverUrl = "http://metcolab.macae.ufrj.br/admin/failures/upload"; // Altere para seu endpoint
 const char* contentType = "text/csv"; // ou "application/octet-stream" se necessário
 
 
@@ -57,6 +59,7 @@ bool sendCSVFile(File& file)
   http.addHeader("Content-Type", contentType);
   http.addHeader("Connection", "close");
   http.addHeader("X-Filename",file.name()); 
+  http.addHeader("X-Device-Name",String(config.station_name)); 
   // Envio via stream
   int httpResponseCode = http.sendRequest("POST", &file, file.size());
 
@@ -68,7 +71,7 @@ bool sendCSVFile(File& file)
 }
 
 
-bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1) {
+bool processFiles(const char* dirPath, const char * todayDateString, int amount) {
     File dir = SD.open(dirPath);
     if (!dir) {
         Serial.println("Falha ao abrir diretório.");
