@@ -8,7 +8,7 @@
 #define DHTPIN 17
 #define ANEMOMETER_PIN 18
 #define PLV_PIN 5
-#define VANE_PIN 36
+#define VANE_PIN 39 //36(DVT)
 #define DHTTYPE DHT22       // Define o tipo de sensor (DHT11 ou DHT22)
 #define LED1 12 // Yellow
 #define LED2 2 // Red
@@ -25,6 +25,6 @@
 
 //Biruta
 #define NUMDIRS 8
-inline int adc[NUMDIRS] = {800, 600, 515, 420, 350, 295, 1900, 1200};
+inline int adc[NUMDIRS] = {326, 489, 827, 56, 82, 116, 163, 228};//{800, 600, 515, 420, 350, 295, 1900, 1200};
 inline char* strVals[NUMDIRS] = {"E", "NE", "N", "NW", "W", "SW", "S", "SE"};
 inline char dirOffset = 0;
