@@ -5,7 +5,7 @@
 #define DEBOUNCE_DELAY 30   // [ms]
 
 // pinos
-#define DHTPIN 17
+#define DHTPIN 19
 #define ANEMOMETER_PIN 18
 #define PLV_PIN 5
 #define VANE_PIN 39 //36(DVT)
