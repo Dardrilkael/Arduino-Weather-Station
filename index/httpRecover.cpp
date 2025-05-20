@@ -7,7 +7,7 @@
 
 // Configurações
 //const char* serverUrl = "http://181.223.111.61:4500/failures/upload";
-const char* serverUrl = "http://metcolab.macae.ufrj.br/admin/failures/upload"; // Altere para seu endpoint
+const char* serverUrl = "http://metcolab.macae.ufrj.br/admin/admin/failures/upload"; // Altere para seu endpoint
 const char* contentType = "text/csv"; // ou "application/octet-stream" se necessário
 
 

@@ -21,6 +21,7 @@
 #include <Base64.h>
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
+#define HTTP_BACKUP_INTERVAL 3600000
 
 bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1);
 extern unsigned long lastPVLImpulseTime; 
@@ -32,7 +33,6 @@ extern Sensors sensors;
 long startTime;
 long startTime5_Seconds;
 unsigned long startTime_BACKUP;
-#define HTTP_BACKUP_INTERVAL 80000
 long startTime100_mS;
 int timeRemaining=0;
 std::string jsonConfig = "{}";
