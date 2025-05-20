@@ -1,6 +1,6 @@
 #pragma once
-
-int getWindDir();
+int  updateWindDirSample();
+int getWindDir(int reading);
 void setupSensors();
 void anemometerChange();
 void pluviometerChange();

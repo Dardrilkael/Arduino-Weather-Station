@@ -192,6 +192,7 @@ void loop() {
     startTime_BACKUP = now;
     processFiles("/falhas",formatedDateString.c_str());
    }
+  int windSample = updateWindDirSample();
   if (now-startTime >= config.interval){
     startTime = now;
 
@@ -209,7 +210,7 @@ void loop() {
     OnDebug(Serial.printf("\n\n Computando dados ...\n");)
 
     Data.timestamp = timestamp;
-    Data.wind_dir = getWindDir();
+    Data.wind_dir = getWindDir(windSample);
     Data.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
     Data.wind_gust  = 3.052f /3.0f* ANEMOMETER_CIRC *findMax(rps,sizeof(rps)/sizeof(int));
     Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (config.interval / 1000.0); // m/s

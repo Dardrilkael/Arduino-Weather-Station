@@ -52,10 +52,37 @@ void beginBMP()
 }
 
 // Controllers
+int  updateWindDirSample() {
+  const int numSamples = 10;
+  const unsigned long sampleInterval = 10;
 
-int getWindDir() {
-  long long val, x, reading;
-  val = analogRead(VANE_PIN);
+  static int sampleCount = 0;
+  static long total = 0;
+  static unsigned long lastSampleTime = 0;
+  static int averagedVal = -1;
+
+  unsigned long now = millis();
+
+  if (sampleCount < numSamples && now - lastSampleTime >= sampleInterval) {
+    lastSampleTime = now;
+    total += analogRead(VANE_PIN);
+    sampleCount++;
+
+    if (sampleCount == numSamples) {
+      averagedVal = total / numSamples;
+      total = 0;
+      sampleCount = 0;
+    }
+  }
+  return averagedVal;
+
+
+}
+
+
+int getWindDir(int reading) {
+  long long val, x;
+  val = reading;
   int closestIndex = 0;
   int closestDifference = std::abs(val - adc[0]);
 
