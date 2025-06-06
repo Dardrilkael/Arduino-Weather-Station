@@ -168,6 +168,7 @@ void loop() {
     }
   }
 
+/*
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[WiFi] Conexão perdida. Tentando reconectar...");
 
@@ -175,7 +176,7 @@ void loop() {
     delay(1000);       // Espera um pouco
 
     setupWifi("LOOP", config.wifi_ssid, config.wifi_password);
-  }
+  }*/
 
   digitalWrite(LED3,HIGH);
   unsigned long now = millis();
@@ -186,7 +187,6 @@ void loop() {
   }
 
   digitalWrite(LED1,LOW);
-  digitalWrite(LED2,LOW);
 
    if (now-startTime_BACKUP >= HTTP_BACKUP_INTERVAL){
     startTime_BACKUP = now;
@@ -196,7 +196,7 @@ void loop() {
     startTime = now;
 
     digitalWrite(LED1,HIGH);
-    digitalWrite(LED2,HIGH);
+
 
     rtc_wdt_feed(); // -- WATCH-DOG
 
@@ -248,6 +248,7 @@ void loop() {
     healthCheck.isMqttConnected = mqqtClient1.loopMqtt();
     healthCheck.timeRemaining = ((startTime + config.interval - now) / 1000);
 
+    digitalWrite(LED2,healthCheck.isWifiConnected);
     const char * hcCsv = parseHealthCheckData(healthCheck, 1);
   
     OnDebug(Serial.printf("\n\nColetando dados, metricas em %d segundos ...", ((startTime + config.interval - now) / 1000));)
