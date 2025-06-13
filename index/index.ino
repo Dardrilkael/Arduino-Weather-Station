@@ -249,6 +249,11 @@ void loop() {
     healthCheck.timeRemaining = ((startTime + config.interval - now) / 1000);
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
+    if(!healthCheck.isWifiConnected){
+      WiFi.disconnect(true); // Disconnect and erase old credentials
+      delay(100);            // Short delay to ensure disconnect
+      WiFi.begin(config.wifi_ssid, config.wifi_password);
+    }
     const char * hcCsv = parseHealthCheckData(healthCheck, 1);
   
     OnDebug(Serial.printf("\n\nColetando dados, metricas em %d segundos ...", ((startTime + config.interval - now) / 1000));)
