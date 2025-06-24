@@ -250,8 +250,9 @@ void loop() {
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
     if(!healthCheck.isWifiConnected){
-      WiFi.disconnect(true); // Disconnect and erase old credentials
-      delay(100);            // Short delay to ensure disconnect
+      WiFi.disconnect(true, true); // Disconnect and erase old credentials
+      delay(500);            // Short delay to ensure disconnect
+      WiFi.mode(WIFI_STA); 
       WiFi.begin(config.wifi_ssid, config.wifi_password);
     }
     const char * hcCsv = parseHealthCheckData(healthCheck, 1);
