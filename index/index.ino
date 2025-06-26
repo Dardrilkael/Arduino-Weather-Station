@@ -146,8 +146,10 @@ void setup() {
     delay(400);
   }
   
-  char jsonPayload[100];
-  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu}", FIRMWARE_VERSION, timestamp);
+  esp_reset_reason_t reason = esp_reset_reason();
+  Serial.println(reason);
+  char jsonPayload[100]{0};
+  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, timestamp,reason);
   mqqtClient1.publish((sysReportMqqtTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
   startTime = millis();
@@ -250,8 +252,8 @@ void loop() {
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
     if(!healthCheck.isWifiConnected){
-      WiFi.disconnect(true, true); // Disconnect and erase old credentials
-      delay(500);            // Short delay to ensure disconnect
+      WiFi.disconnect(true, true);
+      delay(500);            
       WiFi.mode(WIFI_STA); 
       WiFi.begin(config.wifi_ssid, config.wifi_password);
     }

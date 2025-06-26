@@ -35,6 +35,28 @@ bool renameFile(File& file, const char* path) {
     }
 }
 
+bool deleteFile(File& file, const char* path) {
+    String currentName = file.name();
+
+    // Garante que o path termina com "/"
+    String basePath = String(path);
+    if (!basePath.endsWith("/")) {
+        basePath += "/";
+    }
+
+    // Constroi o caminho completo
+    String fullFileName = basePath + currentName;
+
+    file.close(); // Fecha antes de deletar
+
+    if (SD.remove(fullFileName.c_str())) {
+        Serial.printf("Arquivo deletado: %s\n", fullFileName.c_str());
+        return true;
+    } else {
+        Serial.printf("Falha ao deletar o arquivo: %s\n", fullFileName.c_str());
+        return false;
+    }
+}
 
 
 
@@ -97,7 +119,8 @@ bool processFiles(const char* dirPath, const char * todayDateString, int amount)
             }
 
             if (sendCSVFile(file)) {
-                renameFile(file, dirPath);
+                deleteFile(file, dirPath);
+                //renameFile(file, dirPath);
             }
 
             count++;
