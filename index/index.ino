@@ -186,6 +186,7 @@ void loop() {
   if (now - startTime100_mS >= 100){
     startTime100_mS = now;
     mqqtClient1.loopMqtt();
+    timestamp = timeClient.getEpochTime();
   }
 
   digitalWrite(LED1,LOW);
@@ -252,7 +253,8 @@ void loop() {
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
     if(!healthCheck.isWifiConnected){
-      storeLog("lp-wf-rcnt");
+      storeLog(timeClient.getFormattedTime().c_str());
+      storeLog(": lp-wf-rcnt\n");
       WiFi.disconnect(true, true);
       delay(500);            
       WiFi.mode(WIFI_STA); 
