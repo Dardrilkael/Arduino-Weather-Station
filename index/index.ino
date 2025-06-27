@@ -93,7 +93,7 @@ void setup() {
   logIt("\n1. Estação iniciada: ", true);
   esp_reset_reason_t reason = esp_reset_reason();
   logIt(String(reason).c_str(), true);
-  
+
   bool loadedSD = loadConfiguration(SD, configFileName, config, jsonConfig);
   const char* bluetoothName = nullptr;
   if(loadedSD) bluetoothName=config.station_name;
@@ -255,8 +255,9 @@ void loop() {
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
     if(!healthCheck.isWifiConnected){
-      storeLog(timeClient.getFormattedTime().c_str());
-      storeLog(": lp-wf-rcnt\n");
+      logIt((formatedDateString + "  ").c_str(),true);
+      logIt(timeClient.getFormattedTime().c_str(),true);
+      logIt(": lp-wf-rcnt\n",true);
       WiFi.disconnect(true, true);
       delay(500);            
       WiFi.mode(WIFI_STA); 
