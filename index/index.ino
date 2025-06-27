@@ -90,8 +90,10 @@ void setup() {
   createDirectory("/logs");
 
   OnDebug(Serial.printf("\n - Carregando variáveis de ambiente");)
-  logIt("\n1. Estação iniciada;", true);
-
+  logIt("\n1. Estação iniciada: ", true);
+  esp_reset_reason_t reason = esp_reset_reason();
+  logIt(String(reason).c_str(), true);
+  
   bool loadedSD = loadConfiguration(SD, configFileName, config, jsonConfig);
   const char* bluetoothName = nullptr;
   if(loadedSD) bluetoothName=config.station_name;
@@ -146,7 +148,7 @@ void setup() {
     delay(400);
   }
   
-  esp_reset_reason_t reason = esp_reset_reason();
+  
   Serial.println(reason);
   char jsonPayload[100]{0};
   sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, timestamp,reason);
