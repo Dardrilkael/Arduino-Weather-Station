@@ -252,6 +252,7 @@ void loop() {
 
     digitalWrite(LED2,healthCheck.isWifiConnected);
     if(!healthCheck.isWifiConnected){
+      storeLog("lp-wf-rcnt");
       WiFi.disconnect(true, true);
       delay(500);            
       WiFi.mode(WIFI_STA); 
