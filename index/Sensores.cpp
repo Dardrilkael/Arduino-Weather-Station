@@ -12,13 +12,13 @@ DHT dht(DHTPIN, DHTTYPE);
 Adafruit_BMP085 bmp;
 
 // Pluviometro
-unsigned long lastPVLImpulseTime = 0;
-unsigned int rainCounter = 0;
+volatile unsigned long lastPVLImpulseTime = 0;
+volatile unsigned int rainCounter = 0;
 
 // Anemometro (Velocidade do vento)
-float anemometerCounter = 0.0f;
-unsigned long lastVVTImpulseTime = 0;
-unsigned long smallestDeltatime=4294967295;
+volatile int anemometerCounter = 0.0f;
+volatile unsigned long lastVVTImpulseTime = 0;
+volatile unsigned long smallestDeltatime=4294967295;
 unsigned int gustIndex = 0;  
 unsigned int previousCounter= 0;
 Sensors sensors;
@@ -69,17 +69,17 @@ int getWindDir() {
   return closestIndex;
 }
 
-void anemometerChange() {
+void IRAM_ATTR anemometerChange() {
   unsigned long currentMillis = millis();
   unsigned long deltaTime = currentMillis - lastVVTImpulseTime;
   if (deltaTime >= DEBOUNCE_DELAY) {
-    smallestDeltatime = min(deltaTime, smallestDeltatime);
+    smallestDeltatime = (deltaTime<smallestDeltatime) * deltaTime + (deltaTime>smallestDeltatime) * smallestDeltatime;
     anemometerCounter++;
     lastVVTImpulseTime = currentMillis;
   }
 }
 
-void pluviometerChange() {
+void IRAM_ATTR pluviometerChange() {
   unsigned long currentMillis = millis();
   if (currentMillis - lastPVLImpulseTime >= DEBOUNCE_DELAY) {
     rainCounter++;
@@ -121,8 +121,8 @@ void WindGustRead(unsigned int now)
     if(gustInterval>=3000)
     {
       lastAssignement= now;
-      int revolutions = anemometerCounter- previousCounter;
-      previousCounter=anemometerCounter;
+      int revolutions = anemometerCounter - previousCounter;
+      previousCounter = anemometerCounter;
       rps[gustIndex++] = revolutions;
       gustIndex = gustIndex%20;
     }
