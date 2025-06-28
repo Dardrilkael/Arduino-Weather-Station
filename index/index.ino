@@ -24,10 +24,10 @@
 #define HTTP_BACKUP_INTERVAL 3600000
 
 bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1);
-extern unsigned long lastPVLImpulseTime; 
-extern unsigned int rainCounter;
-extern unsigned long lastVVTImpulseTime;
-extern float anemometerCounter;
+extern volatile unsigned long lastPVLImpulseTime; 
+extern volatile unsigned int rainCounter;
+extern volatile  unsigned long lastVVTImpulseTime;
+extern volatile int anemometerCounter;
 extern int rps[20];
 extern Sensors sensors;
 long startTime;
