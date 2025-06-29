@@ -70,7 +70,7 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
         BLECharacteristic::PROPERTY_NOTIFY );
 
     pHealthCharacteristic->setValue("");
-
+    pHealthCharacteristic->addDescriptor(new BLE2902());
     // Start the service
     pService->start();
 
