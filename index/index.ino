@@ -249,7 +249,7 @@ void loop() {
     // Health check
     healthCheck.timestamp = timestamp;
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
-    healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI()) * -1;
+    healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
     healthCheck.isMqttConnected = mqqtClient1.loopMqtt();
     healthCheck.timeRemaining = ((startTime + config.interval - now) / 1000);
 
@@ -266,7 +266,9 @@ void loop() {
     const char * hcCsv = parseHealthCheckData(healthCheck, 1);
   
     OnDebug(Serial.printf("\n\nColetando dados, metricas em %d segundos ...", ((startTime + config.interval - now) / 1000));)
-    OnDebug(Serial.printf("\n  - %s",hcCsv);)
+    OnDebug(Serial.printf("\n  - %s\n",hcCsv);)
+    // Atualizando BLE advertsting value
+    BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
 
     //if(!healthCheck.isWifiConnected)setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
     // Garantindo conexão com mqqt broker;
@@ -280,8 +282,6 @@ void loop() {
     sprintf(mqttHealthCheck, "{\"timestamp\":%lu,\"wifiDBM\":\"%i\"}", timestamp, WiFi.RSSI());
     mqqtClient1.publish((sysReportMqqtTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1);//retained
     
-   // Atualizando BLE advertsting value
-    BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
   }
 
 }
