@@ -14,28 +14,35 @@ BLECharacteristic *pHealthCharacteristic = nullptr;
 
 bool deviceConnected = false;
 int (*characteristicCB)(const char *uid, const std::string &content);
-class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer *pServer){
+class ServerCallbacks : public BLEServerCallbacks
+{
+    void onConnect(BLEServer *pServer)
+    {
         std::cout << "Novo dispositivo conectado.\n";
         deviceConnected = true;
     };
 
-    void onDisconnect(BLEServer *pServer){
+    void onDisconnect(BLEServer *pServer)
+    {
         deviceConnected = false;
         BLEDevice::startAdvertising();
     }
 };
 
-class CharacteristicsCallback : public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
+class CharacteristicsCallback : public BLECharacteristicCallbacks
+{
+    void onWrite(BLECharacteristic *pCharacteristic)
+    {
         std::string rxValue = std::string(pCharacteristic->getValue().c_str());
         const char *characteristicUid = pCharacteristic->getUUID().toString().c_str();
-        if (rxValue.empty() || !characteristicCB) return;
+        if (rxValue.empty() || !characteristicCB)
+            return;
         characteristicCB(characteristicUid, rxValue);
     }
 };
 
-void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std::string &content)) {
+void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std::string &content))
+{
 
     characteristicCB = callback;
 
@@ -56,9 +63,9 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     // Create the Configuration Characteristic
     pConfigCharacteristic = pService->createCharacteristic(
         CONFIGURATION_UUID,
-        BLECharacteristic::PROPERTY_READ   | 
-        BLECharacteristic::PROPERTY_WRITE  |
-        BLECharacteristic::PROPERTY_NOTIFY);
+        BLECharacteristic::PROPERTY_READ |
+            BLECharacteristic::PROPERTY_WRITE |
+            BLECharacteristic::PROPERTY_NOTIFY);
 
     pConfigCharacteristic->setValue("");
     pConfigCharacteristic->setCallbacks(new CharacteristicsCallback());
@@ -66,8 +73,8 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     // Create the Health Check Characteristic
     pHealthCharacteristic = pService->createCharacteristic(
         HEALTH_CHECK_UUID,
-        BLECharacteristic::PROPERTY_READ   |
-        BLECharacteristic::PROPERTY_NOTIFY );
+        BLECharacteristic::PROPERTY_READ |
+            BLECharacteristic::PROPERTY_NOTIFY);
 
     pHealthCharacteristic->setValue("");
     pHealthCharacteristic->addDescriptor(new BLE2902());
@@ -82,22 +89,30 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     BLEDevice::startAdvertising();
 }
 
-void BLE::updateValue(const char *characteristicId, const std::string &newValue){
-    if (newValue.length() == 0) return;
+void BLE::updateValue(const char *characteristicId, const std::string &newValue)
+{
+    if (newValue.length() == 0)
+        return;
     std::cout << "\n  - Emitindo valores via Bluetooth (" << newValue << ") \n";
-    if(characteristicId == HEALTH_CHECK_UUID){
+    if (characteristicId == HEALTH_CHECK_UUID)
+    {
         pHealthCharacteristic->setValue((newValue.c_str()));
         pHealthCharacteristic->notify();
-    }else if(characteristicId == CONFIGURATION_UUID) {
+    }
+    else if (characteristicId == CONFIGURATION_UUID)
+    {
         pConfigCharacteristic->setValue((newValue.c_str()));
         pConfigCharacteristic->notify();
-    } else {
+    }
+    else
+    {
         std::cout << "Characteristica não encontrada.\n";
         std::cout << newValue;
     }
 }
 
-bool BLE::stop(){
+bool BLE::stop()
+{
     BLEDevice::getAdvertising()->stop();
     deviceConnected = false;
     BLEDevice::deinit(true);

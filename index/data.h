@@ -1,16 +1,17 @@
 #pragma once
 // --- Config data  ---
-struct Config {
-    char station_uid[32]{0};
-    char station_name[64]{0};
-    char wifi_ssid[64]{0};
-    char wifi_password[64]{0};
-    char mqtt_server[64]{0};
-    char mqtt_username[64]{0};
-    char mqtt_password[64]{0};
-    char mqtt_topic[64]{0};
-    int mqtt_port;
-    int interval;
+struct Config
+{
+  char station_uid[32]{0};
+  char station_name[64]{0};
+  char wifi_ssid[64]{0};
+  char wifi_password[64]{0};
+  char mqtt_server[64]{0};
+  char mqtt_username[64]{0};
+  char mqtt_password[64]{0};
+  char mqtt_topic[64]{0};
+  int mqtt_port;
+  int interval;
 };
 
 extern Config config;
@@ -18,7 +19,8 @@ extern const char *configFileName;
 
 // --- HeachCheck data  ---
 
-struct HealthCheck {
+struct HealthCheck
+{
   const char *softwareVersion;
   int timestamp;
   bool isWifiConnected;
@@ -32,7 +34,8 @@ extern char hcCsvOutput[240];
 const char *parseHealthCheckData(HealthCheck hc, int type = 1);
 // --- Metrics data  ---
 
-struct Metrics {
+struct Metrics
+{
   float wind_speed = 0;
   float wind_gust = 0;
   float rain_acc = 0;
@@ -43,7 +46,7 @@ struct Metrics {
   long timestamp;
 };
 
-extern Metrics Data; 
+extern Metrics Data;
 
 extern char metricsjsonOutput[240];
 extern char metricsCsvOutput[240];
