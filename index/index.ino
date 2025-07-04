@@ -22,6 +22,7 @@
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
 #define HTTP_BACKUP_INTERVAL 3600000
+const float ANEMOMETER_FACTOR = 3.052;
 bool sendCSVFile(File &file, const char *url);
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 extern volatile unsigned long lastPVLImpulseTime;
@@ -31,13 +32,16 @@ extern volatile int anemometerCounter;
 extern int rps[20];
 extern Sensors sensors;
 long startTime;
-long startTime5_Seconds;
 unsigned long startTime_BACKUP;
 long startTime100_mS;
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
 String formatedDateString = "";
 bool isBeforeNoon = true;
+struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
+
+// Define constant for wind gust calculation
+const float WIND_GUST_FACTOR = 3.052f / 3.0f;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 // -- MQTT
 String sysReportMqqtTopic;
@@ -141,8 +145,8 @@ void setup()
   // 2; Inicio
   logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
 
-  int timestamp = timeClient.getEpochTime();
-  convertTimeToLocaleDate(timestamp);
+  int setupTimestamp = timeClient.getEpochTime();
+  convertTimeToLocaleDate(setupTimestamp);
 
   String dataHora = String(formatedDateString) + "T" + timeClient.getFormattedTime();
   storeLog(("\n" + dataHora + "\n").c_str());
@@ -158,7 +162,7 @@ void setup()
 
   logDebugln(reason);
   char jsonPayload[100]{0};
-  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, timestamp, reason);
+  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
   mqqtClient1.publish((sysReportMqqtTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
   startTime = millis();
@@ -214,13 +218,13 @@ void loop()
 
     logDebugf("\n\n Computando dados ...\n");
 
-    Data.timestamp = timestamp;
     Data.wind_dir = getWindDir();
     Data.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
-    Data.wind_gust = 3.052f / 3.0f * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
+    Data.wind_gust = WIND_GUST_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
     Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (config.interval / 1000.0); // m/s
 
     DHTRead(Data.humidity, Data.temperature);
+    BMPRead(Data.pressure);
     BMPRead(Data.pressure);
 
     // Apresentação
@@ -322,7 +326,7 @@ int bluetoothController(const char *uid, const std::string &content)
 
 void publishJsonResponse(const char *topic, const JsonObject &response)
 {
-  char buffer[256];
+  char buffer[512];
   size_t len = serializeJson(response, buffer, sizeof(buffer));
   mqqtClient1.publish(topic, buffer, false);
 }
@@ -372,7 +376,7 @@ void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
   while (file.available())
   {
     StaticJsonDocument<512> jsonChunk;
-    jsonChunk["chunk"] = chunkNum + 1; // 1-based index
+    jsonChunk["chunk"] = ++chunkNum; // 1-based index
     jsonChunk["id"] = id;
 
     char data[chunkSize];
@@ -380,11 +384,7 @@ void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
     String base64Data = base64::encode((unsigned char *)data, bytesRead);
     jsonChunk["data"] = base64Data;
 
-    char jsonBuffer[513];
-    serializeJson(jsonChunk, jsonBuffer);
-    mqqtClient1.publish(fileMqqtTopic, jsonBuffer);
-
-    chunkNum++;
+    publishJsonResponse(fileMqqtTopic, jsonChunk.as<JsonObject>());
   }
   file.close();
 
@@ -448,7 +448,8 @@ void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
     DynamicJsonDocument chunkResponse(256);
     chunkResponse["id"] = id;
 
-    for (const char *dirList; (dirList = listDirectory(dir, 128))[0];)
+    const char *dirList = nullptr;
+    for (; (dirList = listDirectory(dir, 128))[0];)
     {
       // tring base64Data = base64::encode((unsigned char*)data, bytesRead);
       chunkResponse["data"] = dirList; // base64::encode((unsigned char*)dirList,strlen(dirList));
@@ -537,16 +538,10 @@ void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
 void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
 {
   logDebugln("exec MQTT cmd");
-  char *jsonBuffer = new char[length + 1];
-  memcpy(jsonBuffer, (char *)payload, length);
-  jsonBuffer[length] = '\0';
 
-  logDebugln(jsonBuffer);
-  logDebugln(topic);
-
-  DynamicJsonDocument doc(length + 1);
-  DeserializationError error = deserializeJson(doc, jsonBuffer);
-  delete[] jsonBuffer;
+  // Parse payload as JSON
+  DynamicJsonDocument doc(length + 128); // Add some headroom
+  DeserializationError error = deserializeJson(doc, payload, length);
   if (error)
   {
     logDebug("deserializeJson() failed: ");
@@ -563,33 +558,37 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
 
   if (docData.containsKey("cmd"))
   {
-
-    if (strcmp(docData["cmd"], "update") == 0)
+    const char *cmd = docData["cmd"];
+    if (strcmp(cmd, "update") == 0)
     {
-      const char *url = docData["url"];
-      const char *id = docData["id"];
-      if (!id)
+      const char *url = docData["url"] | "";
+      const char *id = docData["id"] | "";
+      if (!id || !*id)
         return;
 
       logDebug("URL: ");
       logDebugln(url);
-      String urlStr(url);
 
-      const size_t capacity = 100;
-      char jsonString[capacity];
-      snprintf(jsonString, sizeof(jsonString), "{\"id\":\"%s\",\"status\":1}", id);
-      mqqtClient1.publish((sysReportMqqtTopic + String("/OTA")).c_str(), jsonString);
-      bool result = OTA::update(urlStr);
+      // Send OTA start status
+      DynamicJsonDocument respStart(128);
+      respStart["id"] = id;
+      respStart["status"] = 1;
+      publishJsonResponse((sysReportMqqtTopic + String("/OTA")).c_str(), respStart.as<JsonObject>());
 
-      printf("%d", result);
+      bool result = OTA::update(String(url));
+
+      // Ensure MQTT connection after OTA
       if (healthCheck.isWifiConnected && !mqqtClient1.loopMqtt())
       {
         if (mqqtClient1.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
           mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
       }
 
-      snprintf(jsonString, sizeof(jsonString), "{\"id\":\"%s\",\"status\":%i}", id, 4 - 2 * result);
-      mqqtClient1.publish((sysReportMqqtTopic + String("/OTA")).c_str(), jsonString);
+      // Send OTA result status
+      DynamicJsonDocument respEnd(128);
+      respEnd["id"] = id;
+      respEnd["status"] = 4 - 2 * result;
+      publishJsonResponse((sysReportMqqtTopic + String("/OTA")).c_str(), respEnd.as<JsonObject>());
 
       logDebugln("Update successful!");
       logDebugln("Reiniciando");
@@ -597,13 +596,16 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
       ESP.restart();
     }
     else
+    {
       executeCommand(docData, sysReportMqqtTopic.c_str());
+    }
   }
 }
 
 void convertTimeToLocaleDate(long timestamp)
 {
-  struct tm *ptm = gmtime((time_t *)&timestamp);
+  time_t t = (time_t)timestamp;
+  struct tm *ptm = gmtime(&t);
   int day = ptm->tm_mday;
   int month = ptm->tm_mon + 1;
   int year = ptm->tm_year + 1900;
