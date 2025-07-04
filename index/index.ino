@@ -22,7 +22,7 @@
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
 #define HTTP_BACKUP_INTERVAL 3600000
-
+bool sendCSVFile(File& file,const char* url);
 bool processFiles(const char* dirPath, const char * todayDateString = nullptr, int amount = 1);
 extern volatile unsigned long lastPVLImpulseTime; 
 extern volatile unsigned int rainCounter;
@@ -311,123 +311,201 @@ int bluetoothController(const char *uid, const std::string &content) {
   return 0;
 }
 
+void publishJsonResponse(const char* topic, const JsonObject& response) {
+    char buffer[256];
+    size_t len = serializeJson(response, buffer, sizeof(buffer));
+    mqqtClient1.publish(topic, buffer, false);
+}
+
 void sendFileChunks(const char* path, const char* fileMqqtTopic, const char* id) {
     File file = SD.open(path);
     if (!file) {
-        mqqtClient1.publish(fileMqqtTopic, "{\"error\":\"could not open dir\"}");
+        mqqtClient1.publish(fileMqqtTopic, "{\"error\":\"could not open file\"}");
         return;
     }
 
     if (file.isDirectory()) {
-       
         File dir = file;
-        dir.rewindDirectory(); 
+        dir.rewindDirectory();
         while (true) {
             File entry = dir.openNextFile();
-            if (!entry) break; 
-            sendFileChunks((String(path)+String("/")+String(entry.name())).c_str(), fileMqqtTopic,id);
+            if (!entry) break;
+            sendFileChunks((String(path) + "/" + entry.name()).c_str(), fileMqqtTopic, id);
             entry.close();
         }
-    } else {
-      
-        size_t fileSize = file.size();
-        //TODO change chunkzise acoording to the filepath length
-        size_t chunkSize = 256;
-        size_t totalChunks = (fileSize + chunkSize - 1) / chunkSize;
-        size_t chunkNum = 0;
-
-        while (file.available()) {
-            // Create a JSON object for the chunk
-            StaticJsonDocument<512> jsonChunk;
-            jsonChunk["type"] = "file";
-            jsonChunk["filename"] = path;
-            jsonChunk["chunk"] = chunkNum + 1; // 1-based index
-            jsonChunk["total_chunks"] = totalChunks;
-            jsonChunk["id"] = id;
-            char data[chunkSize + 1]; 
-            size_t bytesRead = file.readBytes(data, chunkSize);
-            data[bytesRead] = '\0'; 
-            String base64Data = base64::encode((unsigned char*)data, bytesRead);
-            jsonChunk["data"] = base64Data;
-            char jsonBuffer[513]; 
-            serializeJson(jsonChunk, jsonBuffer);
-            jsonBuffer[513]=0;
-            Serial.print(jsonBuffer);
-            mqqtClient1.publish(fileMqqtTopic, jsonBuffer);
-
-            chunkNum++;
-        }
         file.close();
-        StaticJsonDocument<128> completeMessage;
-        completeMessage["type"] = "file";
-        completeMessage["filename"] = path;
-        completeMessage["chunk"] = 0; // 0 indicates completion
-        completeMessage["total_chunks"] = totalChunks;
-        completeMessage["data"] = "complete"; // Indicate the transfer is complete
-        completeMessage["id"] = id;
-
-        // Publish the completion message
-        char completeBuffer[128];
-        serializeJson(completeMessage, completeBuffer);
-        mqqtClient1.publish(fileMqqtTopic, completeBuffer);
-
+        return;
     }
+
+    size_t fileSize = file.size();
+    size_t chunkSize = 256;
+    size_t totalChunks = (fileSize + chunkSize - 1) / chunkSize;
+    size_t chunkNum = 0;
+
+    // Send start message with totalChunks
+    {
+        StaticJsonDocument<256> startMsg;
+        startMsg["status"] = "start";
+        startMsg["filename"] = path;
+        startMsg["totalChunks"] = totalChunks;
+        startMsg["id"] = id;
+
+        publishJsonResponse(fileMqqtTopic, startMsg.as<JsonObject>());
+    }
+
+    // Send data chunks
+    while (file.available()) {
+        StaticJsonDocument<512> jsonChunk;
+        jsonChunk["chunk"] = chunkNum + 1; // 1-based index
+        jsonChunk["id"] = id;
+
+        char data[chunkSize];
+        size_t bytesRead = file.readBytes(data, chunkSize);
+        String base64Data = base64::encode((unsigned char*)data, bytesRead);
+        jsonChunk["data"] = base64Data;
+
+        char jsonBuffer[513];
+        serializeJson(jsonChunk, jsonBuffer);
+        mqqtClient1.publish(fileMqqtTopic, jsonBuffer);
+
+        chunkNum++;
+    }
+    file.close();
+
+    // Send end message with totalChunks
+    
+      StaticJsonDocument<256> endMsg;
+      endMsg["status"] = "end";
+      endMsg["filename"] = path;
+      endMsg["totalChunks"] = totalChunks;
+      endMsg["id"] = id;
+      publishJsonResponse(fileMqqtTopic, endMsg.as<JsonObject>());
+    
 }
+
   
+
+
 
 void executeCommand(JsonObject& docData, const char* sysReportMqqtTopic) {
     OnDebug(Serial.println("Executing command");)
-    const char* strCommand = ((const char*)docData["cmd"]);
-    char command = strCommand[0]; // Assuming cmd is a string containing a single character
+
+    const char* id = docData["id"] | "0";
+    const char* strCommand = docData["cmd"] | "z";
+    char command = strCommand[0]; // First char as command
+
+    // Helper function to publish JSON responses
+    auto send = [sysReportMqqtTopic](JsonDocument& doc) {
+        publishJsonResponse(sysReportMqqtTopic, doc.as<JsonObject>());
+    };
+
+    DynamicJsonDocument response(256);
+    response["id"] = id;
 
     switch (command) {
-        case 'r':{ // Restart
-            ESP.restart();
-            break;}   
 
-        case 'l':{ // List directory
+        case 'r': { // Restart
+            response["status"] = "single";
+            response["message"] = "Restarting ESP32";
+            send(response);
+            delay(100); // Allow MQTT to send
+            ESP.restart();
+            break;
+        }
+
+        case 'l': { // List directory
             const char* dirPath = docData["dir"] | "/";
             File dir = SD.open(dirPath);
             if (!dir || !dir.isDirectory()) {
-               mqqtClient1.publish(sysReportMqqtTopic, "Could not open directory");
+                response["status"] = "error";
+                response["error"] = "Could not open directory";
+                send(response);
                 return;
             }
-            mqqtClient1.publish(sysReportMqqtTopic, "started_sending");
-            for (const char* dirList; (dirList = listDirectory(dir, 256))[0]; mqqtClient1.publish(sysReportMqqtTopic, dirList));
-            mqqtClient1.publish(sysReportMqqtTopic, "ended_sending");
-            dir.close();
-            break;}
 
-        case 'g': {// Get file
-            const char* filename = docData["fn"] | "";
-            sendFileChunks(filename,(String("file") + String(config.mqtt_topic)).c_str(),docData["id"]|"0");break;
+            // Start message
+            response["status"] = "start";
+            send(response);
+
+            // Send directory contents in chunks
+            DynamicJsonDocument chunkResponse(256);
+            chunkResponse["id"] = id;
+
+            for (const char* dirList; (dirList = listDirectory(dir, 128))[0]; ) {
+              //tring base64Data = base64::encode((unsigned char*)data, bytesRead);
+                chunkResponse["data"] = dirList;//base64::encode((unsigned char*)dirList,strlen(dirList));
+                send(chunkResponse);
             }
 
-        case 'a':{ // Append file
+            // End message
+            response.clear();
+            response["id"] = id;
+            response["status"] = "end";
+            send(response);
+            dir.close();
+            break;
+        }
+
+        case 'g': { // Get file (delegates to existing handler)
+            const char* filename = docData["fn"] | "";
+            sendFileChunks(filename, (String("file") + String(config.mqtt_topic)).c_str(), id);
+            break;
+        }
+
+        case 'h': { // Get file (delegates to existing handler)
+            const char* filename = docData["fn"] | "";
+            File file = SD.open(filename);
+            if (!file) {
+              response["error"] = "could not open file";
+              send(response);
+              break;
+            }
+
+            response["status"] ="single";
+            response["sent"] = sendCSVFile(file,"http://192.168.0.223:3000/api/upload-file");
+            send(response);
+            break;
+        }
+
+        case 'a': { // Append to file
             const char* filename = docData["fn"] | "";
             const char* content = docData["content"] | "";
             appendFile(SD, filename, content);
-            break;}
-
-        case 'd':{ // Delete file
-            const char* filename = docData["fn"] | "";
-            if (SD.remove(filename)) {
-              mqqtClient1.publish(sysReportMqqtTopic, "File_deleted_successfully");
-            } else {
-              mqqtClient1.publish(sysReportMqqtTopic, "could not delte file");
-            }
+            response["status"] = "single";
+            response["message"] = "Content appended";
+            send(response);
             break;
         }
-        case 'v':
-        {
-        mqqtClient1.publish(sysReportMqqtTopic, FIRMWARE_VERSION);break;
+
+        case 'd': { // Delete file
+            const char* filename = docData["fn"] | "";
+            response["status"] = "single";
+            if (SD.remove(filename)) {
+                response["message"] = "File deleted successfully";
+            } else {
+                response["message"] = "Could not delete file";
+            }
+            send(response);
+            break;
         }
-        default:
-            mqqtClient1.publish(sysReportMqqtTopic, "Unknown command");
+
+        case 'v': { // Firmware version
+            response["status"] = "single";
+            response["version"] = FIRMWARE_VERSION;
+            send(response);
+            break;
+        }
+
+        default: {
+            response["status"] = "error";
+            response["error"] = "Unknown command";
+            send(response);
             Serial.println("Unknown command");
             break;
+        }
     }
 }
+
 
 
 void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
@@ -456,8 +534,8 @@ void mqttSubCallback(char* topic, unsigned char* payload, unsigned int length) {
    
     if (docData.containsKey("cmd")) {
        
-       if (strcmp(docData["cmd"],"update")==0) {
-      const char* url = docData["url"];
+      if (strcmp(docData["cmd"],"update")==0) {
+        const char* url = docData["url"];
       const char* id = docData["id"];
       if(!id) return;
 
@@ -502,15 +580,3 @@ void convertTimeToLocaleDate(long timestamp) {
   isBeforeNoon = ptm->tm_hour < 12;
 }
 
-// Dever ser usado somente para debugar
-void wifiWatcher(){
-  if (!healthCheck.isWifiConnected ) {
-    if(++wifiDisconnectCount > 60) {
-      logIt("Reiniciando a forca, problemas no wifi identificado.");
-      ESP.restart();
-    };
-
-  } else {
-    wifiDisconnectCount = 0;
-  }
-}

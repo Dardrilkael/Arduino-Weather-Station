@@ -9,7 +9,15 @@
 //const char* serverUrl = "http://181.223.111.61:4500/failures/upload";
 const char* serverUrl = "http://metcolab.macae.ufrj.br/admin/admin/failures/upload"; // Altere para seu endpoint
 const char* contentType = "text/csv"; // ou "application/octet-stream" se necessário
-
+String getContentType(String filename) {
+  if (filename.endsWith(".txt")) return "text/csv";
+  else if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".json")) return "application/json";
+  else if (filename.endsWith(".jpg")) return "image/jpeg";
+  else if (filename.endsWith(".png")) return "image/png";
+  else if (filename.endsWith(".pdf")) return "application/pdf";
+  else return "application/octet-stream";  // default for unknown
+}
 
 bool renameFile(File& file, const char* path) {
     String currentName = file.name();
@@ -61,7 +69,7 @@ bool deleteFile(File& file, const char* path) {
 
 
 // Envia um arquivo CSV via POST direto do cartão SD
-bool sendCSVFile(File& file)
+bool sendCSVFile(File& file,const char* url)
 {
   if (!file) {
     Serial.printf("Erro ao abrir arquivo %s\n", file.name());
@@ -70,15 +78,15 @@ bool sendCSVFile(File& file)
   if(file.name()[0]=='@')return false;
 
   HTTPClient http;
-  Serial.printf("Enviando arquivo %s para %s\n", file.name(), serverUrl);
+  Serial.printf("Enviando arquivo %s para %s\n", file.name(), url);
 
-  if (!http.begin(serverUrl)) {
+  if (!http.begin(url)) {
     Serial.println("Falha ao iniciar conexão HTTP");
     file.close();
     return false;
   }
 
-  http.addHeader("Content-Type", contentType);
+  http.addHeader("Content-Type", getContentType(file.name()));
   http.addHeader("Connection", "close");
   http.addHeader("X-Filename",file.name()); 
   http.addHeader("X-Device-Name",String(config.station_name)); 
@@ -91,7 +99,6 @@ bool sendCSVFile(File& file)
 
   return (httpResponseCode > 0 && httpResponseCode < 300);
 }
-
 
 bool processFiles(const char* dirPath, const char * todayDateString, int amount) {
     File dir = SD.open(dirPath);
@@ -118,7 +125,7 @@ bool processFiles(const char* dirPath, const char * todayDateString, int amount)
                 continue;
             }
 
-            if (sendCSVFile(file)) {
+            if (sendCSVFile(file, serverUrl)) {
                 deleteFile(file, dirPath);
                 //renameFile(file, dirPath);
             }
