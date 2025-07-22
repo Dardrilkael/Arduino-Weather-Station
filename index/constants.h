@@ -19,7 +19,8 @@
 
 // Anemometro (Velocidade do vento)
 #define ANEMOMETER_CIRC (2.0 * 3.14159265 * 0.085) // Circunferência anemometro (m)
-
+const float ANEMOMETER_FACTOR = 3.052;
+const float WIND_GUST_FACTOR = 3.052f / 3.0f;
 // Pluviometro
 #define VOLUME_PLUVIOMETRO 0.34 // Volume do pluviometro em mm
 

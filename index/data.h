@@ -36,20 +36,20 @@ const char *parseHealthCheckData(HealthCheck hc, int type = 1);
 
 struct Metrics
 {
+  long timestamp=0;
+  int wind_dir = -1;
   float wind_speed = 0;
   float wind_gust = 0;
   float rain_acc = 0;
   float humidity = 0;
   float temperature = 0;
   float pressure = 0;
-  int wind_dir = -1;
-  long timestamp;
 };
 
-extern Metrics Data;
+
 
 extern char metricsjsonOutput[240];
 extern char metricsCsvOutput[240];
 extern char csvHeader[200];
 
-void parseData();
+void parseData(const Metrics& metric);

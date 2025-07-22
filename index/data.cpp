@@ -40,33 +40,33 @@ char metricsjsonOutput[240]{0};
 char metricsCsvOutput[240]{0};
 char csvHeader[200]{0};
 
-void parseData()
+void parseData(const Metrics& metric)
 {
   // parse measurements data to json
   const char *json_template = "{\"timestamp\": %i, \"temperatura\": %s, \"umidade_ar\": %s, \"velocidade_vento\": %.2f, \"rajada_vento\": %.2f, \"dir_vento\": %d, \"volume_chuva\": %.2f, \"pressao\": %s, \"uid\": \"%s\", \"identidade\": \"%s\"}";
   sprintf(metricsjsonOutput, json_template,
-          Data.timestamp,
-          isnan(Data.temperature) ? "null" : String(Data.temperature),
-          isnan(Data.humidity) ? "null" : String(Data.humidity),
-          Data.wind_speed,
-          Data.wind_gust,
-          Data.wind_dir,
-          Data.rain_acc,
-          Data.pressure == -1 ? "null" : String(Data.pressure),
+          metric.timestamp,
+          isnan(metric.temperature) ? "null" : String(metric.temperature),
+          isnan(metric.humidity) ? "null" : String(metric.humidity),
+          metric.wind_speed,
+          metric.wind_gust,
+          metric.wind_dir,
+          metric.rain_acc,
+          metric.pressure == -1 ? "null" : String(metric.pressure),
           config.station_uid,
           config.station_name);
 
   // parse measurement data to csv
   const char *csv_template = "%i,%s,%s,%.2f,%.2f,%d,%.2f,%s,%s,%s\n";
   sprintf(metricsCsvOutput, csv_template,
-          Data.timestamp,
-          isnan(Data.temperature) ? "null" : String(Data.temperature),
-          isnan(Data.humidity) ? "null" : String(Data.humidity),
-          Data.wind_speed,
-          Data.wind_gust,
-          Data.wind_dir,
-          Data.rain_acc,
-          Data.pressure == -1 ? "null" : String(Data.pressure),
+          metric.timestamp,
+          isnan(metric.temperature) ? "null" : String(metric.temperature),
+          isnan(metric.humidity) ? "null" : String(metric.humidity),
+          metric.wind_speed,
+          metric.wind_gust,
+          metric.wind_dir,
+          metric.rain_acc,
+          metric.pressure == -1 ? "null" : String(metric.pressure),
           config.station_uid,
           config.station_name);
 }

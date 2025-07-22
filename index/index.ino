@@ -7,7 +7,7 @@
 #include "data.h"
 #include "sd-repository.h"
 #include "integration.h"
-#include "sensores.h"
+#include "Sensors.h"
 #include <stdio.h>
 #include "esp_system.h"
 #include "bt-integration.h"
@@ -22,18 +22,13 @@
 // -- WATCH-DOG
 #define WDT_TIMEOUT 600000
 #define HTTP_BACKUP_INTERVAL 3600000
-const float ANEMOMETER_FACTOR = 3.052;
+
 bool sendCSVFile(File &file, const char *url);
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
-extern volatile unsigned long lastPVLImpulseTime;
-extern volatile unsigned int rainCounter;
-extern volatile unsigned long lastVVTImpulseTime;
-extern volatile int anemometerCounter;
-extern int rps[20];
-extern Sensors sensors;
+
 long startTime;
 unsigned long startTime_BACKUP;
-long startTime100_mS;
+long startTime100_mS, startTime5_Seconds;
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
 String formatedDateString = "";
@@ -41,13 +36,12 @@ bool isBeforeNoon = true;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 
 // Define constant for wind gust calculation
-const float WIND_GUST_FACTOR = 3.052f / 3.0f;
-struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
-// -- MQTT
-String sysReportMqqtTopic;
-// String softwareReleaseMqttTopic;
-MQTT mqqtClient1;
 
+// -- MQTT
+String sysReportMqttTopic;
+// String softwareReleaseMqttTopic;
+MQTT mqttClient;
+Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
 
@@ -65,7 +59,7 @@ void watchdogRTC()
   rtc_wdt_protect_off(); // Disable RTC WDT write protection
   rtc_wdt_disable();
   rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
-  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT); // timeout rtd_wdt 10000ms.
+  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT); // timeout rtd_wdt 600000ms (10 minutes).
   rtc_wdt_enable();                              // Start the RTC WDT timer
   rtc_wdt_protect_on();                          // Enable RTC WDT write protection
 }
@@ -83,12 +77,10 @@ void setup()
   digitalWrite(LED1, HIGH);
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
+  logDebug("\n\nIniciando sensores ...\n");
+  sensores.init();
 
-  pinMode(PLV_PIN, INPUT_PULLDOWN);
-  pinMode(ANEMOMETER_PIN, INPUT_PULLUP);
   pinMode(16, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PLV_PIN), pluviometerChange, RISING);
-  attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), anemometerChange, FALLING);
 
   logIt("\nIniciando cartão SD");
   initSdCard();
@@ -119,28 +111,25 @@ void setup()
 
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
   setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
-  int nivelDbm = (WiFi.RSSI()) * -1;
+  int nivelDbm = WiFi.RSSI();
   storeLog((String(nivelDbm) + ";").c_str());
 
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
   connectNtp("  - NTP");
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
-  mqqtClient1.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
-  // softwareReleaseMqttTopic = String("software-release/") + String(config.mqtt_topic);
-
-  // mqqtClient2.setupMqtt("- MQTT2", config.mqtt_hostV2_server, config.mqtt_hostV2_port, config.mqtt_hostV2_username, config.mqtt_hostV2_password, softwareReleaseMqttTopic.c_str());
-  mqqtClient1.setCallback(mqttSubCallback);
-  mqqtClient1.setBufferSize(512);
-  mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
-  sysReportMqqtTopic = (String("sys-report") + String(config.mqtt_topic));
+  mqttClient.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+  mqttClient.setCallback(mqttSubCallback);
+  mqttClient.setBufferSize(512);
+  mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+  sysReportMqttTopic = (String("sys-report") + String(config.mqtt_topic));
 
   logIt("\n\n1.5 Iniciando controllers;", true);
-  setupSensors();
 
   int now = millis();
-  lastVVTImpulseTime = now;
-  lastPVLImpulseTime = now;
+  // TODO
+  // lastVVTImpulseTime = now;
+  // lastPVLImpulseTime = now;
 
   // 2; Inicio
   logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
@@ -163,7 +152,7 @@ void setup()
   logDebugln(reason);
   char jsonPayload[100]{0};
   sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
-  mqqtClient1.publish((sysReportMqqtTopic + String("/handshake")).c_str(), jsonPayload, 1);
+  mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
   startTime = millis();
   startTime5_Seconds = startTime;
@@ -187,11 +176,11 @@ void loop()
 
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
-  WindGustRead(now);
+  sensores.updateWindGust(now);
   if (now - startTime100_mS >= 100)
   {
     startTime100_mS = now;
-    mqqtClient1.loopMqtt();
+    mqttClient.loopMqtt();
     timestamp = timeClient.getEpochTime();
   }
 
@@ -218,18 +207,10 @@ void loop()
 
     logDebugf("\n\n Computando dados ...\n");
 
-    Data.wind_dir = getWindDir();
-    Data.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
-    Data.wind_gust = WIND_GUST_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
-    Data.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (config.interval / 1000.0); // m/s
-
-    DHTRead(Data.humidity, Data.temperature);
-    BMPRead(Data.pressure);
-    BMPRead(Data.pressure);
+    const Metrics &sensorsData = sensores.getMeasurements(timestamp);
+    parseData(sensorsData);
 
     // Apresentação
-    parseData();
-    // logDebugf("\nResultado CSV:\n%s", metricsCsvOutput); )
     logDebugf("\nResultado JSON:\n%s\n", metricsjsonOutput);
 
     // Armazenamento local
@@ -238,13 +219,12 @@ void loop()
 
     // Enviando Dados Remotamente
     logDebugln("\n Enviando Resultados:  ");
-    bool measurementSent1 = mqqtClient1.publish(config.mqtt_topic, metricsjsonOutput);
-    if (!measurementSent1)
+    bool measurementSent = mqttClient.publish(config.mqtt_topic, metricsjsonOutput);
+    if (!measurementSent)
       storeMeasurement("/falhas", formatedDateString, metricsCsvOutput);
     // Update metrics advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
-    resetSensors();
   }
 
   now = millis();
@@ -256,7 +236,7 @@ void loop()
     healthCheck.timestamp = timestamp;
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
     healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
-    healthCheck.isMqttConnected = mqqtClient1.loopMqtt();
+    healthCheck.isMqttConnected = mqttClient.loopMqtt();
     healthCheck.timeRemaining = ((startTime + config.interval - now) / 1000);
 
     digitalWrite(LED2, healthCheck.isWifiConnected);
@@ -281,14 +261,14 @@ void loop()
     //  Garantindo conexão com mqqt broker;
     if (healthCheck.isWifiConnected && !healthCheck.isMqttConnected)
     {
-      healthCheck.isMqttConnected = mqqtClient1.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+      healthCheck.isMqttConnected = mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
       if (healthCheck.isMqttConnected)
-        mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+        mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
     // Enviando dados de health check
     char mqttHealthCheck[100];
     sprintf(mqttHealthCheck, "{\"timestamp\":%lu,\"wifiDBM\":\"%i\"}", timestamp, WiFi.RSSI());
-    mqqtClient1.publish((sysReportMqqtTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1); // retained
+    mqttClient.publish((sysReportMqttTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1); // retained
   }
 }
 
@@ -328,7 +308,7 @@ void publishJsonResponse(const char *topic, const JsonObject &response)
 {
   char buffer[512];
   size_t len = serializeJson(response, buffer, sizeof(buffer));
-  mqqtClient1.publish(topic, buffer, false);
+  mqttClient.publish(topic, buffer, false);
 }
 
 void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
@@ -336,7 +316,7 @@ void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
   File file = SD.open(path);
   if (!file)
   {
-    mqqtClient1.publish(fileMqqtTopic, "{\"error\":\"could not open file\"}");
+    mqttClient.publish(fileMqqtTopic, "{\"error\":\"could not open file\"}");
     return;
   }
 
@@ -398,7 +378,7 @@ void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
   publishJsonResponse(fileMqqtTopic, endMsg.as<JsonObject>());
 }
 
-void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
+void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
 {
   logDebugln("Executing command");
 
@@ -407,9 +387,9 @@ void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
   char command = strCommand[0]; // First char as command
 
   // Helper function to publish JSON responses
-  auto send = [sysReportMqqtTopic](JsonDocument &doc)
+  auto send = [sysReportMqttTopic](JsonDocument &doc)
   {
-    publishJsonResponse(sysReportMqqtTopic, doc.as<JsonObject>());
+    publishJsonResponse(sysReportMqttTopic, doc.as<JsonObject>());
   };
 
   DynamicJsonDocument response(256);
@@ -448,7 +428,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
     DynamicJsonDocument chunkResponse(256);
     chunkResponse["id"] = id;
 
-    const char *dirList = nullptr;
+    const char *dirList = "\00";
     for (; (dirList = listDirectory(dir, 128))[0];)
     {
       // tring base64Data = base64::encode((unsigned char*)data, bytesRead);
@@ -524,6 +504,46 @@ void executeCommand(JsonObject &docData, const char *sysReportMqqtTopic)
     break;
   }
 
+  case 'c':
+  { // Configuration
+    response["status"] = "single";
+    response["config"] = jsonConfig;
+    send(response);
+    break;
+  }
+  case 'u':
+  { // Update OTA
+    const char *url = docData["url"] | "";
+    if (!url || !*url)
+    {
+      response["status"] = "error";
+      response["error"] = "No URL provided";
+      send(response);
+      return;
+    }
+    // Send OTA start status
+    response["status"] = "start";
+    send(response);
+
+    bool result = OTA::update(String(url));
+
+    // Ensure MQTT connection after OTA
+    if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
+    {
+      if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
+        mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+    }
+
+    // Send OTA result status
+    response["status"] = result ? "success" : "failure";
+    send(response);
+
+    logDebugln("Update successful!");
+    logDebugln("Reiniciando");
+    delay(1500);
+    ESP.restart();
+    break;
+  }
   default:
   {
     response["status"] = "error";
@@ -573,22 +593,25 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
       DynamicJsonDocument respStart(128);
       respStart["id"] = id;
       respStart["status"] = 1;
-      publishJsonResponse((sysReportMqqtTopic + String("/OTA")).c_str(), respStart.as<JsonObject>());
+      publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respStart.as<JsonObject>());
 
       bool result = OTA::update(String(url));
 
       // Ensure MQTT connection after OTA
-      if (healthCheck.isWifiConnected && !mqqtClient1.loopMqtt())
+      if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
       {
-        if (mqqtClient1.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
-          mqqtClient1.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+        if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
+          mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
       }
 
       // Send OTA result status
+      // OTA status codes: 2 = failure, 4 = success
+      const int OTA_STATUS_FAILURE = 2;
+      const int OTA_STATUS_SUCCESS = 4;
       DynamicJsonDocument respEnd(128);
       respEnd["id"] = id;
-      respEnd["status"] = 4 - 2 * result;
-      publishJsonResponse((sysReportMqqtTopic + String("/OTA")).c_str(), respEnd.as<JsonObject>());
+      respEnd["status"] = result ? OTA_STATUS_SUCCESS : OTA_STATUS_FAILURE;
+      publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respEnd.as<JsonObject>());
 
       logDebugln("Update successful!");
       logDebugln("Reiniciando");
@@ -597,7 +620,7 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
     }
     else
     {
-      executeCommand(docData, sysReportMqqtTopic.c_str());
+      executeCommand(docData, sysReportMqttTopic.c_str());
     }
   }
 }
@@ -606,9 +629,11 @@ void convertTimeToLocaleDate(long timestamp)
 {
   time_t t = (time_t)timestamp;
   struct tm *ptm = gmtime(&t);
+  char dateBuffer[11];
   int day = ptm->tm_mday;
   int month = ptm->tm_mon + 1;
   int year = ptm->tm_year + 1900;
-  formatedDateString = String(day) + "-" + String(month) + "-" + String(year);
   isBeforeNoon = ptm->tm_hour < 12;
+  sprintf(dateBuffer, "%02d-%02d-%04d", day, month, year);
+  formatedDateString = String(dateBuffer);
 }

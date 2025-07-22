@@ -108,7 +108,6 @@ bool loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::st
         config.interval = doc["INTERVAL"] | 60000;
         parseWIFIString(doc["WIFI"], config.wifi_ssid, config.wifi_password);
         parseMQTTString(doc["MQTT_HOST"], config.mqtt_username, config.mqtt_password, config.mqtt_server, config.mqtt_port);
-        // parseMQTTString(doc["MQTT_HOST_V2"],config.mqtt_hostV2_username,config.mqtt_hostV2_password,config.mqtt_hostV2_server,config.mqtt_hostV2_port);
         file.close();
         success = true;
         serializeJson(doc, configJson);
