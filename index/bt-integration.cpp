@@ -77,7 +77,10 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
             BLECharacteristic::PROPERTY_NOTIFY);
 
     pHealthCharacteristic->setValue("");
-    pHealthCharacteristic->addDescriptor(new BLE2902());
+    BLE2902 *desc = new BLE2902();
+    desc->setNotifications(true); // <- ESSENCIAL para Android!
+    pHealthCharacteristic->addDescriptor(desc);
+
     // Start the service
     pService->start();
 
