@@ -16,10 +16,7 @@ bool MQTT::publish(const char *topic, const char *payload, bool retained)
   bool sent = (m_Client->publish(topic, payload, retained));
   if (sent)
   {
-    logDebug("  - MQTT broker: Message publised [");
-    logDebug(topic);
-    logDebugln("]: ");
-    logDebugln(payload);
+    logDebugf("  - MQTT broker: Message publised [%s]: %s\n", topic, payload);
   }
   else
   {

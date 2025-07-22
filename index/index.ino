@@ -605,9 +605,9 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
       }
 
       // Send OTA result status
-      // OTA status codes: 2 = failure, 4 = success
-      const int OTA_STATUS_FAILURE = 2;
-      const int OTA_STATUS_SUCCESS = 4;
+      // OTA status codes: 4 = failure, 2 = success
+      const int OTA_STATUS_FAILURE = 4;
+      const int OTA_STATUS_SUCCESS = 2;
       DynamicJsonDocument respEnd(128);
       respEnd["id"] = id;
       respEnd["status"] = result ? OTA_STATUS_SUCCESS : OTA_STATUS_FAILURE;
