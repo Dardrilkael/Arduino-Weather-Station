@@ -23,7 +23,7 @@
 #define WDT_TIMEOUT 600000
 #define HTTP_BACKUP_INTERVAL 3600000
 
-bool sendCSVFile(File &file, const char *url);
+bool sendCSVFile(File &file, const char *url, const char* id = "0");
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 
 long startTime;
@@ -455,6 +455,13 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
   case 'h':
   { // Get file (delegates to existing handler)
     const char *filename = docData["fn"] | "";
+    const char *url = docData["url"] |"0";
+   
+    if(!url[0])
+    {
+      response["error"] = "no destination";
+      send(response);
+    }
     File file = SD.open(filename);
     if (!file)
     {
@@ -464,7 +471,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     }
 
     response["status"] = "single";
-    response["sent"] = sendCSVFile(file, "http://192.168.0.223:3000/api/upload-file");
+    response["sent"] = sendCSVFile(file, url,id);
     send(response);
     break;
   }

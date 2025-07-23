@@ -86,7 +86,7 @@ bool deleteFile(File &file, const char *path)
 }
 
 // Envia um arquivo CSV via POST direto do cartão SD
-bool sendCSVFile(File &file, const char *url)
+bool sendCSVFile(File &file, const char *url, const char* id)
 {
     if (!file)
     {
@@ -95,6 +95,12 @@ bool sendCSVFile(File &file, const char *url)
     }
     if (file.name()[0] == '@')
         return false;
+
+    if (file.size() == 0) {
+    logDebugf("Arquivo %s está vazio — envio cancelado\n", file.name());
+    file.close();
+    return false;
+}
 
     HTTPClient http;
     logDebugf("Enviando arquivo %s para %s\n", file.name(), url);
@@ -110,6 +116,8 @@ bool sendCSVFile(File &file, const char *url)
     http.addHeader("Connection", "close");
     http.addHeader("X-Filename", file.name());
     http.addHeader("X-Device-Name", String(config.station_name));
+    http.addHeader("X-Cmd-Id", String(id));  // <- Aqui!
+
     // Envio via stream
     int httpResponseCode = http.sendRequest("POST", &file, file.size());
 
@@ -152,7 +160,7 @@ bool processFiles(const char *dirPath, const char *todayDateString, int amount)
                 continue;
             }
 
-            if (sendCSVFile(file, serverUrl))
+            if (sendCSVFile(file, serverUrl,"automatic"))
             {
                 deleteFile(file, dirPath);
                 // renameFile(file, dirPath);
