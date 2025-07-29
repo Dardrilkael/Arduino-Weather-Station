@@ -1,9 +1,11 @@
 #pragma once
 #include "data.h"
 
-class Sensors {
-  public:
-    struct {
+class Sensors
+{
+public:
+    struct
+    {
         bool bmp = false;
         // Add other sensor status flags here if needed
     } bits;
@@ -18,9 +20,8 @@ class Sensors {
     void updateWindGust(unsigned int now);
     void reset();
     const Metrics &getMeasurements(unsigned long timestamp);
+
 private:
     Metrics m_Measurements;
     int findMax(int arr[], int size);
-
 };
-

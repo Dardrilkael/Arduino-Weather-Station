@@ -23,7 +23,6 @@ unsigned int gustIndex = 0;
 unsigned int previousCounter = 0;
 int rps[20]{0};
 
-
 void IRAM_ATTR onAnemometerChange()
 {
   unsigned long currentMillis = millis();
@@ -45,8 +44,6 @@ void IRAM_ATTR onPluviometerChange()
   }
 }
 
-
-
 void Sensors::reset()
 {
   noInterrupts();
@@ -59,20 +56,19 @@ void Sensors::reset()
   memset(rps, 0, sizeof(rps));
 }
 
-
 void Sensors::init()
 {
   pinMode(PLV_PIN, INPUT_PULLDOWN);
   pinMode(ANEMOMETER_PIN, INPUT_PULLUP);
 
-  noInterrupts();  // Disable interrupts while setting volatile vars
+  noInterrupts(); // Disable interrupts while setting volatile vars
   lastPVLImpulseTime = millis();
   lastVVTImpulseTime = millis();
-  interrupts();    // Re-enable interrupts
+  interrupts(); // Re-enable interrupts
 
   attachInterrupt(digitalPinToInterrupt(PLV_PIN), onPluviometerChange, RISING);
   attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), onAnemometerChange, FALLING);
-  
+
   logDebugln("Iniciando DHT");
   dht.begin();
 
@@ -106,7 +102,6 @@ int Sensors::readWindDirection()
   }
   return closestIndex;
 }
-
 
 void Sensors::readDHT(float &hum, float &temp)
 {
@@ -144,7 +139,7 @@ void Sensors::updateWindGust(unsigned int now)
   if (gustInterval >= 3000)
   {
     lastAssignement = now;
-    int snapshot = anemometerCounter;  // Safe copy
+    int snapshot = anemometerCounter; // Safe copy
     int revolutions = snapshot - previousCounter;
     previousCounter = snapshot;
 
@@ -152,7 +147,6 @@ void Sensors::updateWindGust(unsigned int now)
     rps[gustIndex++] = revolutions;
   }
 }
-
 
 const Metrics &Sensors::getMeasurements(unsigned long timestamp)
 {
@@ -175,7 +169,6 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
   reset();
   return m_Measurements;
 }
-
 
 int Sensors::findMax(int arr[], int size)
 {

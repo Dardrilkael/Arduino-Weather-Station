@@ -136,7 +136,7 @@ void createFile(fs::FS &fs, const char *path, const char *message)
 {
   logDebugf("Salvando json no cartao SD: %s\n.", path);
 
-    File file = fs.open(path, FILE_WRITE);
+  File file = fs.open(path, FILE_WRITE);
   if (!file)
   {
     logDebugln(" - Falha ao encontrar cartão SD.");
