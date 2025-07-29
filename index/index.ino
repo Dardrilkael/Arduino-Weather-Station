@@ -222,6 +222,7 @@ void loop()
     bool measurementSent = mqttClient.publish(config.mqtt_topic, metricsjsonOutput);
     if (!measurementSent)
       storeMeasurement("/falhas", formatedDateString, metricsCsvOutput);
+    
     // Update metrics advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");

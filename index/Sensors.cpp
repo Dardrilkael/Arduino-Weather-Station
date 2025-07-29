@@ -49,12 +49,16 @@ void IRAM_ATTR onPluviometerChange()
 
 void Sensors::reset()
 {
+  noInterrupts();
   rainCounter = 0;
   anemometerCounter = 0;
+  interrupts();
+
   gustIndex = 0;
   previousCounter = 0;
   memset(rps, 0, sizeof(rps));
 }
+
 
 void Sensors::init()
 {
@@ -133,25 +137,38 @@ void Sensors::updateWindGust(unsigned int now)
   if (gustInterval >= 3000)
   {
     lastAssignement = now;
-    int revolutions = anemometerCounter - previousCounter;
-    previousCounter = anemometerCounter;
-    rps[gustIndex++] = revolutions;
+    int snapshot = anemometerCounter;  // Safe copy
+    int revolutions = snapshot - previousCounter;
+    previousCounter = snapshot;
+
     gustIndex = gustIndex % 20;
+    rps[gustIndex++] = revolutions;
   }
 }
 
+
 const Metrics &Sensors::getMeasurements(unsigned long timestamp)
 {
+  int anemometerSnapshot, rainSnapshot;
+
+  noInterrupts();
+  anemometerSnapshot = anemometerCounter;
+  rainSnapshot = rainCounter;
+  interrupts();
+
   m_Measurements.timestamp = timestamp;
-  m_Measurements.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerCounter) / (config.interval / 1000.0); // m/s
+  m_Measurements.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0); // m/s
   m_Measurements.wind_gust = WIND_GUST_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
-  m_Measurements.rain_acc = rainCounter * VOLUME_PLUVIOMETRO;
+  m_Measurements.rain_acc = rainSnapshot * VOLUME_PLUVIOMETRO;
   m_Measurements.wind_dir = readWindDirection();
+
   readDHT(m_Measurements.humidity, m_Measurements.temperature);
   readBMP(m_Measurements.pressure);
+  
   reset();
   return m_Measurements;
 }
+
 
 int Sensors::findMax(int arr[], int size)
 {
