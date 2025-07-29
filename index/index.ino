@@ -20,15 +20,23 @@
 #include "pch.h"
 #include <Base64.h>
 // -- WATCH-DOG
-#define WDT_TIMEOUT 600000
-#define HTTP_BACKUP_INTERVAL 3600000
+
+
+
+// Timing intervals in milliseconds
+constexpr unsigned long WDT_TIMEOUT_MS = 600000;
+
+Timer timer100ms(100);
+Timer timerBackup(3600000);  // 1 hour
+Timer timerMain(config.interval);
+Timer timerHealthCheck(5000);
 
 bool sendCSVFile(File &file, const char *url, const char* id = "0");
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
+int bluetoothController(const char *uid, const std::string &content);
+void convertTimeToLocaleDate(long timestamp);
 
 long startTime;
-unsigned long startTime_BACKUP;
-long startTime100_mS, startTime5_Seconds;
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
 String formatedDateString = "";
@@ -59,7 +67,7 @@ void watchdogRTC()
   rtc_wdt_protect_off(); // Disable RTC WDT write protection
   rtc_wdt_disable();
   rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
-  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT); // timeout rtd_wdt 600000ms (10 minutes).
+  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT_MS); // timeout rtd_wdt 600000ms (10 minutes).
   rtc_wdt_enable();                              // Start the RTC WDT timer
   rtc_wdt_protect_on();                          // Enable RTC WDT write protection
 }
@@ -127,7 +135,7 @@ void setup()
   logIt("\n\n1.5 Iniciando controllers;", true);
 
   int now = millis();
-  // TODO
+  // TODO its in sensors init now
   // lastVVTImpulseTime = now;
   // lastPVLImpulseTime = now;
 
@@ -154,10 +162,18 @@ void setup()
   sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
   mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
-  startTime = millis();
-  startTime5_Seconds = startTime;
-  startTime100_mS = startTime;
-  startTime_BACKUP = startTime - HTTP_BACKUP_INTERVAL;
+
+
+  // Inicialização dos timers com o tempo atual
+  startTime = millis(); // marca o momento de referência
+
+  timerMain.interval = config.interval;
+  timerMain.lastTime = startTime;
+
+  timer100ms.lastTime = startTime;
+  timerBackup.lastTime = startTime - timerBackup.interval;
+  timerHealthCheck.lastTime = startTime;
+
 }
 
 int timestamp = 0;
@@ -177,23 +193,20 @@ void loop()
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
   sensores.updateWindGust(now);
-  if (now - startTime100_mS >= 100)
+  if(timer100ms.check(now))
   {
-    startTime100_mS = now;
     mqttClient.loopMqtt();
     timestamp = timeClient.getEpochTime();
   }
 
   digitalWrite(LED1, LOW);
 
-  if (now - startTime_BACKUP >= HTTP_BACKUP_INTERVAL)
+  if(timerBackup.check(now))
   {
-    startTime_BACKUP = now;
     processFiles("/falhas", formatedDateString.c_str());
   }
-  if (now - startTime >= config.interval)
+  if(timerMain.check(now))
   {
-    startTime = now;
 
     digitalWrite(LED1, HIGH);
 
@@ -222,16 +235,15 @@ void loop()
     bool measurementSent = mqttClient.publish(config.mqtt_topic, metricsjsonOutput);
     if (!measurementSent)
       storeMeasurement("/falhas", formatedDateString, metricsCsvOutput);
-    
+
     // Update metrics advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
 
-  now = millis();
-  if (now - startTime5_Seconds >= 5000)
+
+  if (timerHealthCheck.check(now))
   {
-    startTime5_Seconds = now;
 
     // Health check
     healthCheck.timestamp = timestamp;

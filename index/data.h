@@ -53,3 +53,19 @@ extern char metricsCsvOutput[240];
 extern char csvHeader[200];
 
 void parseData(const Metrics& metric);
+
+
+struct Timer {
+  unsigned long lastTime;
+  unsigned long interval;
+
+  Timer(unsigned long intervalMs) : lastTime(0), interval(intervalMs) {}
+
+  bool check(unsigned long now) {
+    if (now - lastTime >= interval) {
+      lastTime = now;
+      return true;
+    }
+    return false;
+  }
+};

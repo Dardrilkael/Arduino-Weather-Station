@@ -64,8 +64,15 @@ void Sensors::init()
 {
   pinMode(PLV_PIN, INPUT_PULLDOWN);
   pinMode(ANEMOMETER_PIN, INPUT_PULLUP);
+
+  noInterrupts();  // Disable interrupts while setting volatile vars
+  lastPVLImpulseTime = millis();
+  lastVVTImpulseTime = millis();
+  interrupts();    // Re-enable interrupts
+
   attachInterrupt(digitalPinToInterrupt(PLV_PIN), onPluviometerChange, RISING);
   attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), onAnemometerChange, FALLING);
+  
   logDebugln("Iniciando DHT");
   dht.begin();
 
@@ -164,7 +171,7 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
 
   readDHT(m_Measurements.humidity, m_Measurements.temperature);
   readBMP(m_Measurements.pressure);
-  
+
   reset();
   return m_Measurements;
 }
