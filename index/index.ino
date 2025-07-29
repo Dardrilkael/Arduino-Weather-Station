@@ -21,17 +21,15 @@
 #include <Base64.h>
 // -- WATCH-DOG
 
-
-
 // Timing intervals in milliseconds
 constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
 Timer timer100ms(100);
-Timer timerBackup(3600000);  // 1 hour
+Timer timerBackup(3600000); // 1 hour
 Timer timerMain(config.interval);
 Timer timerHealthCheck(5000);
 
-bool sendCSVFile(File &file, const char *url, const char* id = "0");
+bool sendCSVFile(File &file, const char *url, const char *id = "0");
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 int bluetoothController(const char *uid, const std::string &content);
 void convertTimeToLocaleDate(long timestamp);
@@ -68,8 +66,8 @@ void watchdogRTC()
   rtc_wdt_disable();
   rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
   rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT_MS); // timeout rtd_wdt 600000ms (10 minutes).
-  rtc_wdt_enable();                              // Start the RTC WDT timer
-  rtc_wdt_protect_on();                          // Enable RTC WDT write protection
+  rtc_wdt_enable();                                 // Start the RTC WDT timer
+  rtc_wdt_protect_on();                             // Enable RTC WDT write protection
 }
 
 void setup()
@@ -162,8 +160,6 @@ void setup()
   sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
   mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
-
-
   // Inicialização dos timers com o tempo atual
   startTime = millis(); // marca o momento de referência
 
@@ -173,7 +169,6 @@ void setup()
   timer100ms.lastTime = startTime;
   timerBackup.lastTime = startTime - timerBackup.interval;
   timerHealthCheck.lastTime = startTime;
-
 }
 
 int timestamp = 0;
@@ -193,7 +188,7 @@ void loop()
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
   sensores.updateWindGust(now);
-  if(timer100ms.check(now))
+  if (timer100ms.check(now))
   {
     mqttClient.loopMqtt();
     timestamp = timeClient.getEpochTime();
@@ -201,11 +196,11 @@ void loop()
 
   digitalWrite(LED1, LOW);
 
-  if(timerBackup.check(now))
+  if (timerBackup.check(now))
   {
     processFiles("/falhas", formatedDateString.c_str());
   }
-  if(timerMain.check(now))
+  if (timerMain.check(now))
   {
 
     digitalWrite(LED1, HIGH);
@@ -240,7 +235,6 @@ void loop()
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
-
 
   if (timerHealthCheck.check(now))
   {
@@ -468,9 +462,9 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
   case 'h':
   { // Get file (delegates to existing handler)
     const char *filename = docData["fn"] | "";
-    const char *url = docData["url"] |"0";
-   
-    if(!url[0])
+    const char *url = docData["url"] | "0";
+
+    if (!url[0])
     {
       response["error"] = "no destination";
       send(response);
@@ -484,7 +478,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     }
 
     response["status"] = "single";
-    response["sent"] = sendCSVFile(file, url,id);
+    response["sent"] = sendCSVFile(file, url, id);
     send(response);
     break;
   }
