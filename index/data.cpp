@@ -40,7 +40,7 @@ char metricsjsonOutput[240]{0};
 char metricsCsvOutput[240]{0};
 char csvHeader[200]{0};
 
-void parseData(const Metrics& metric)
+void parseData(const Metrics &metric)
 {
   // parse measurements data to json
   const char *json_template = "{\"timestamp\": %i, \"temperatura\": %s, \"umidade_ar\": %s, \"velocidade_vento\": %.2f, \"rajada_vento\": %.2f, \"dir_vento\": %d, \"volume_chuva\": %.2f, \"pressao\": %s, \"uid\": \"%s\", \"identidade\": \"%s\"}";

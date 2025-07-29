@@ -36,7 +36,7 @@ const char *parseHealthCheckData(HealthCheck hc, int type = 1);
 
 struct Metrics
 {
-  long timestamp=0;
+  long timestamp = 0;
   int wind_dir = -1;
   float wind_speed = 0;
   float wind_gust = 0;
@@ -46,23 +46,23 @@ struct Metrics
   float pressure = 0;
 };
 
-
-
 extern char metricsjsonOutput[240];
 extern char metricsCsvOutput[240];
 extern char csvHeader[200];
 
-void parseData(const Metrics& metric);
+void parseData(const Metrics &metric);
 
-
-struct Timer {
+struct Timer
+{
   unsigned long lastTime;
   unsigned long interval;
 
   Timer(unsigned long intervalMs) : lastTime(0), interval(intervalMs) {}
 
-  bool check(unsigned long now) {
-    if (now - lastTime >= interval) {
+  bool check(unsigned long now)
+  {
+    if (now - lastTime >= interval)
+    {
       lastTime = now;
       return true;
     }
