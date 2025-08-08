@@ -15,14 +15,32 @@ const int misoPin = 27;
 const int clockPin = 25;
 const int RETRY_INTERVAL = 5000;
 
-void SD_BLINK(int interval)
+void SD_BLINK(int interval = 2000, const char *pattern = "... -.. ", int unit = 200)
 {
-  for (int i = 0; i < interval / 500; i++)
+  unsigned long start = millis();
+
+  while (millis() - start < (unsigned long)interval)
   {
-    digitalWrite(LED2, i % 2);
-    delay(500 + ((i % 2 == 0) && (i % 3 > 0)) * 1000);
+    for (int i = 0; pattern[i]; i++)
+    {
+      if (millis() - start >= (unsigned long)interval) return;
+
+      char c = pattern[i];
+      int onTime = (c == '.') * unit + (c == '-') * 3 * unit; // '.' → unit, '-' → 3*unit, ' ' → 0
+
+      if (onTime) {
+        digitalWrite(LED2, HIGH);
+        delay(onTime);
+        digitalWrite(LED2, LOW);
+        delay(unit);  // gap between symbols
+      } else {
+        delay(4 * unit);  // space → pause between letters
+      }
+    }
   }
 }
+
+
 
 // Inicia leitura cartão SD
 void initSdCard()
@@ -60,11 +78,12 @@ void parseMQTTString(const char *mqttString, char *username, char *password, cha
 {
   if (memcmp(mqttString, "mqtt://", 7) != 0)
   {
-    printf("Invalid MQTT string format!\n");
+    logDebugf("Invalid MQTT string format!\n");
     return;
   }
   int size = strlen(mqttString) + 1;
   char *ptr = new char[size - 7];
+  if(!ptr)return;
   strlcpy(ptr, mqttString + 7, size - 7);
   strlcpy(username, strtok(ptr, ":"), 64);
   strlcpy(password, strtok(NULL, "@"), 64);
@@ -78,6 +97,7 @@ void parseWIFIString(const char *wifiString, char *ssid, char *password)
 {
   int size = strlen(wifiString) + 1;
   char *ptr = new char[size];
+  if(!ptr)return;
   strlcpy(ptr, wifiString, size);
   strlcpy(ssid, strtok(ptr, ":"), 64);
   strlcpy(password, strtok(NULL, ""), 64);
