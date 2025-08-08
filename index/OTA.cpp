@@ -3,20 +3,18 @@
 #include <Update.h>
 #include "pch.h"
 #include <WiFi.h>
-bool OTA::update(const String &url)
+bool OTA::update(const String &url,std::function<void(int)> onProgress)
 {
     logDebugln("Starting firmware update...");
 
     HTTPClient http;
 
-    // Begin the HTTP connection
     if (!http.begin(url))
     {
         logDebugln("Unable to connect to the server.");
         return false;
     }
 
-    // Send the request and check the response
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK)
     {
@@ -25,7 +23,6 @@ bool OTA::update(const String &url)
         return false;
     }
 
-    // Get the size of the content to download
     int contentLength = http.getSize();
     if (contentLength <= 0)
     {
@@ -36,40 +33,63 @@ bool OTA::update(const String &url)
 
     logDebugf("Downloading firmware binary (%d bytes)...\n", contentLength);
 
-    // Start the update process
-    if (Update.begin(contentLength))
+    if (!Update.begin(contentLength))
     {
-        logDebugln("Begin update");
+        logDebugln("Failed to begin update.");
+        http.end();
+        return false;
+    }
 
-        // Create a stream to read the firmware binary
-        WiFiClient *stream = http.getStreamPtr();
-        if (Update.writeStream(*stream))
+    WiFiClient *stream = http.getStreamPtr();
+    size_t written = 0;
+    const size_t bufSize = 512;
+    uint8_t buf[bufSize];
+    int lastPercentSent = 0;
+    while (http.connected() && written < (size_t)contentLength)
+    {
+        size_t avail = stream->available();
+        if (avail)
         {
-            logDebugln("Writing stream...");
+            size_t toRead = avail > bufSize ? bufSize : avail;
+            size_t readBytes = stream->readBytes(buf, toRead);
+            if (readBytes == 0)
+            {
+                logDebugln("Read 0 bytes from stream, breaking loop");
+                break;
+            }
 
-            // Finish the update process
-            if (Update.end())
+            size_t writtenNow = Update.write(buf, readBytes);
+            if (writtenNow != readBytes)
             {
-                logDebugln("Download completed successfully.");
+                logDebugln("Write failed");
+                Update.abort();
                 http.end();
-                return true; // Successful update
+                return false;
             }
-            else
-            {
-                logDebugln("Update could not be completed.");
+
+            written += writtenNow;
+
+            int percent = (written * 100) / contentLength;
+            if (percent - lastPercentSent >= 10) {
+                onProgress(percent);
+                lastPercentSent = percent;
             }
+
         }
         else
         {
-            logDebugln("Failed to write the stream.");
+            delay(10); // pequeno delay para evitar CPU 100%
         }
     }
-    else
+
+    if (!Update.end())
     {
-        logDebugln("Failed to begin the update.");
+        logDebugln("Update could not be completed.");
+        http.end();
+        return false;
     }
 
-    // If any step failed, clean up and return false
+    logDebugln("Download completed successfully.");
     http.end();
-    return false;
+    return true;
 }

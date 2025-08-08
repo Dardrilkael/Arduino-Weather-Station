@@ -73,7 +73,7 @@ void watchdogRTC()
 void setup()
 {
   Serial.begin(115200);
-  //WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+  // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   delay(3000);
   logIt("\n >> Sistema Integrado de meteorologia << \n");
 
@@ -538,8 +538,11 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     // Send OTA start status
     response["status"] = "start";
     send(response);
-
-    bool result = OTA::update(String(url));
+    response["status"] = "prs";
+    bool result = OTA::update(String(url), [&](int progres)
+                              {
+        response["prs"] = progres;
+        send(response); });
 
     // Ensure MQTT connection after OTA
     if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
@@ -574,7 +577,7 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
   logDebugln("exec MQTT cmd");
 
   // Parse payload as JSON
-  DynamicJsonDocument doc(length + 128); // Add some headroom
+  DynamicJsonDocument doc(1024 + 128); // Add some headroom
   DeserializationError error = deserializeJson(doc, payload, length);
   if (error)
   {

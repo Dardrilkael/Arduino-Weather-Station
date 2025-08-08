@@ -1,10 +1,10 @@
 #pragma once
-#define FIRMWARE_VERSION "3.0.1653"
+#define FIRMWARE_VERSION "3.0.166"
 #define UPDATE_URL
 #include <Arduino.h>
-
+#include <functional>
 class OTA
 {
 public:
-  static bool update(const String &url);
+  static bool update(const String &url,std::function<void(int)> onProgress = [](int){});
 };
