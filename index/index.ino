@@ -244,7 +244,7 @@ void loop()
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
     healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
     healthCheck.isMqttConnected = mqttClient.loopMqtt();
-    healthCheck.timeRemaining = ((startTime + config.interval - now) / 1000);
+    healthCheck.timeRemaining = ((timerMain.lastTime + timerMain.interval - now) / 1000);
 
     digitalWrite(LED2, healthCheck.isWifiConnected);
     if (!healthCheck.isWifiConnected)
@@ -259,7 +259,7 @@ void loop()
     }
     const char *hcCsv = parseHealthCheckData(healthCheck, 1);
 
-    logDebugf("\n\nColetando dados, metricas em %d segundos ...", ((startTime + config.interval - now) / 1000));
+    logDebugf("\n\nColetando dados, metricas em %d segundos ...", healthCheck.timeRemaining);
     logDebugf("\n  - %s\n", hcCsv);
     // Atualizando BLE advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
