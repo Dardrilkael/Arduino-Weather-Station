@@ -21,7 +21,7 @@ volatile int anemometerCounter = 0;
 volatile unsigned long lastVVTImpulseTime = 0;
 unsigned int gustIndex = 0;
 unsigned int previousCounter = 0;
-int rps[20]{0};
+int rps[GUST_ARRAY_SIZE]{0};
 
 void IRAM_ATTR onAnemometerChange()
 {
@@ -112,22 +112,27 @@ void Sensors::readDHT(float &hum, float &temp)
   })
 }
 
-void Sensors::readBMP(float &press)
+void Sensors::readBMP(float &press, float &temp)
 {
   if (bits.bmp)
   {
     float pressure = bmp.readPressure() / 100.0;
+    float temperature = bmp.readTemperature();
     if (isnan(pressure))
     {
       logDebugln("Falha ao ler o sensor BMP180!");
-      press = -1;
+      press = NAN;
+      temp = NAN;
       return;
     }
     press = pressure;
+    temp = temperature;
   }
   else
   {
     beginBMP();
+    press = NAN;
+    temp = NAN;
   }
 }
 
@@ -143,7 +148,7 @@ void Sensors::updateWindGust(unsigned int now)
     int revolutions = snapshot - previousCounter;
     previousCounter = snapshot;
 
-    gustIndex = gustIndex % 20;
+    gustIndex = gustIndex % GUST_ARRAY_SIZE;
     rps[gustIndex++] = revolutions;
   }
 }
@@ -163,8 +168,18 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
   m_Measurements.rain_acc = rainSnapshot * VOLUME_PLUVIOMETRO;
   m_Measurements.wind_dir = readWindDirection();
 
-  readDHT(m_Measurements.humidity, m_Measurements.temperature);
-  readBMP(m_Measurements.pressure);
+  float temperatura1, temperatura2;
+  readDHT(m_Measurements.humidity,temperatura1);
+  readBMP(m_Measurements.pressure, temperatura2);
+
+
+    // Choose temperatura1 if it's valid, otherwise fallback to temperatura2
+  if (!isnan(temperatura1)) {
+    m_Measurements.temperature = temperatura1;
+  } else {
+    m_Measurements.temperature = temperatura2;
+  }
+  
 
   reset();
   return m_Measurements;

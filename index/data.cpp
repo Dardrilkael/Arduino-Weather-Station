@@ -52,7 +52,7 @@ void parseData(const Metrics &metric)
           metric.wind_gust,
           metric.wind_dir,
           metric.rain_acc,
-          metric.pressure == -1 ? "null" : String(metric.pressure),
+          isnan(metric.pressure)? "null" : String(metric.pressure),
           config.station_uid,
           config.station_name);
 

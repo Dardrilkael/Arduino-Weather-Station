@@ -15,7 +15,7 @@ public:
     int readWindDirection();
     void init();
     void readDHT(float &hum, float &temp);
-    void readBMP(float &press);
+    void readBMP(float &press, float &temp);
     void beginBMP();
     void updateWindGust(unsigned int now);
     void reset();
