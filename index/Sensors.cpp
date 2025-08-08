@@ -1,14 +1,15 @@
 #include "Sensors.h"
 #include "constants.h"
-#include <DHT.h>
+//#include <DHT.h>
+#include <DHTesp.h>
 #include <Wire.h>
 #include <Adafruit_BMP085.h>
 #include <cfloat>
 #include "pch.h"
 #include "esp_attr.h"
 // Temperatura e Humidade
-DHT dht(DHTPIN, DHTTYPE);
-
+//DHT dht(DHTPIN, DHTTYPE);
+DHTesp dht;
 // Pressao
 Adafruit_BMP085 bmp;
 
@@ -69,8 +70,10 @@ void Sensors::init()
   attachInterrupt(digitalPinToInterrupt(PLV_PIN), onPluviometerChange, RISING);
   attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), onAnemometerChange, FALLING);
 
+
   logDebugln("Iniciando DHT");
-  dht.begin();
+  //dht.begin();
+  dht.setup(DHTPIN, DHTesp::DHT22);
 
   logDebugln("Iniciando BMP");
   beginBMP();
@@ -105,10 +108,11 @@ int Sensors::readWindDirection()
 
 void Sensors::readDHT(float &hum, float &temp)
 {
-  hum = dht.readHumidity();
-  temp = dht.readTemperature();
+  hum = dht.getHumidity();
+  temp = dht.getTemperature();
+  
   OnDebug(if (isnan(hum) || isnan(temp)) {
-    logDebugln("Falha ao ler o sensor DHT!");
+    logDebugln("⚠️ Falha ao ler o sensor DHT!");
   })
 }
 
