@@ -138,8 +138,13 @@ bool processFiles(const char *dirPath, const char *todayDateString, int amount)
         return false;
     }
 
-    bool success = true;
+    bool success = false;
     int count = 0;
+
+    String todayFileName;
+    if (todayDateString) {
+        todayFileName = String(todayDateString) + ".txt";
+    }
 
     while (File file = dir.openNextFile())
     {
@@ -154,7 +159,7 @@ bool processFiles(const char *dirPath, const char *todayDateString, int amount)
                 file.close();
                 continue;
             }
-            else if (todayDateString && currentName == (todayDateString + String(".txt")))
+            else if (todayDateString && currentName == todayFileName)
             {
                 logDebugf("Pulando data de hoje: %s\n", currentName.c_str());
                 file.close();
@@ -165,8 +170,9 @@ bool processFiles(const char *dirPath, const char *todayDateString, int amount)
             {
                 deleteFile(file, dirPath);
                 // renameFile(file, dirPath);
+                success = true;
             }
-
+            
             count++;
             if (count >= amount)
             {
