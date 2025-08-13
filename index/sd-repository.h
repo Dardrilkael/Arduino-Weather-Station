@@ -15,30 +15,6 @@ const int misoPin = 27;
 const int clockPin = 25;
 const int RETRY_INTERVAL = 5000;
 
-void SD_BLINK(int interval = 2000, const char *pattern = "... -.. ", int unit = 200)
-{
-  unsigned long start = millis();
-
-  while (millis() - start < (unsigned long)interval)
-  {
-    for (int i = 0; pattern[i]; i++)
-    {
-      if (millis() - start >= (unsigned long)interval) return;
-
-      char c = pattern[i];
-      int onTime = (c == '.') * unit + (c == '-') * 3 * unit; // '.' → unit, '-' → 3*unit, ' ' → 0
-
-      if (onTime) {
-        digitalWrite(LED2, HIGH);
-        delay(onTime);
-        digitalWrite(LED2, LOW);
-        delay(unit);  // gap between symbols
-      } else {
-        delay(4 * unit);  // space → pause between letters
-      }
-    }
-  }
-}
 
 
 
@@ -48,8 +24,9 @@ void initSdCard()
   SPI.begin(clockPin, misoPin, mosiPin);
   while (!SD.begin(chipSelectPin, SPI))
   {
-    logDebugf("\n  - Cartão não encontrado. tentando novamente em %d segundos ...", 2);
-    SD_BLINK(2000);
+    logDebugf("\n  - Cartão não encontrado. tentando novamente em 3 segundos ...");
+    morseCode(LED2, "... -../", 135);
+    //int pin, int interval = 2000, const char *pattern = " ... -.. ", int unit = 200
   }
   logDebug("\n  - Leitor de Cartão iniciado com sucesso!.\n");
 }
@@ -147,7 +124,7 @@ bool loadConfiguration(fs::FS &fs, const char *filename, Config &config, std::st
 
   logDebugf("\n - Proxima tentativa de re-leitura em %d segundos ... \n\n\n", (RETRY_INTERVAL / 1000));
   attemptCount++;
-  SD_BLINK(RETRY_INTERVAL);
+  morseCode(LED2,".",RETRY_INTERVAL);
   return false;
 }
 
