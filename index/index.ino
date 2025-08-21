@@ -539,7 +539,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     response["status"] = "start";
     send(response);
     response["status"] = "prs";
-    bool result = OTA::update(String(url), [&](int progres)
+    OTA_Result result = OTA::update(String(url), [&](int progres)
                               {
         response["prs"] = progres;
         send(response); });
@@ -553,6 +553,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
 
     // Send OTA result status
     response["status"] = result ? "success" : "failure";
+    response["message"] = result.error.c_str();
     send(response);
 
     logDebugln("Update successful!");
@@ -612,7 +613,7 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
       respStart["status"] = 1;
       publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respStart.as<JsonObject>());
 
-      bool result = OTA::update(String(url));
+      OTA_Result result = OTA::update(String(url));
 
       // Ensure MQTT connection after OTA
       if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
@@ -628,6 +629,7 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
       DynamicJsonDocument respEnd(128);
       respEnd["id"] = id;
       respEnd["status"] = result ? OTA_STATUS_SUCCESS : OTA_STATUS_FAILURE;
+      
       publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respEnd.as<JsonObject>());
 
       logDebugln("Update successful!");

@@ -3,7 +3,11 @@
 #include <Update.h>
 #include "pch.h"
 #include <WiFi.h>
-bool OTA::update(const String &url,std::function<void(int)> onProgress)
+#include <string>
+
+
+
+OTA_Result OTA::update(const String &url,std::function<void(int)> onProgress)
 {
     logDebugln("Starting firmware update...");
 
@@ -12,7 +16,7 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
     if (!http.begin(url))
     {
         logDebugln("Unable to connect to the server.");
-        return false;
+        return OTA_Result(false,"nch1");
     }
 
     int httpCode = http.GET();
@@ -20,7 +24,7 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
     {
         logDebugf("HTTP GET failed: %s(%d)\n", http.errorToString(httpCode).c_str(), httpCode);
         http.end();
-        return false;
+        return OTA_Result(false,"nch2");
     }
 
     int contentLength = http.getSize();
@@ -28,7 +32,7 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
     {
         logDebugln("Invalid content length.");
         http.end();
-        return false;
+        return OTA_Result(false,"nch3");
     }
 
     logDebugf("Downloading firmware binary (%d bytes)...\n", contentLength);
@@ -37,7 +41,7 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
     {
         logDebugln("Failed to begin update.");
         http.end();
-        return false;
+        return OTA_Result(false,"ns1");
     }
 
     WiFiClient *stream = http.getStreamPtr();
@@ -62,9 +66,10 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
             if (writtenNow != readBytes)
             {
                 logDebugln("Write failed");
+                std::string errorMsg = Update.errorString();
                 Update.abort();
                 http.end();
-                return false;
+                return OTA_Result(false, errorMsg);
             }
 
             written += writtenNow;
@@ -84,12 +89,12 @@ bool OTA::update(const String &url,std::function<void(int)> onProgress)
 
     if (!Update.end())
     {
-        logDebugln("Update could not be completed.");
+        logDebugf("Update could not be completed. Error: %s\n", Update.errorString());
         http.end();
-        return false;
+        return OTA_Result(false, Update.errorString())  ;
     }
 
     logDebugln("Download completed successfully.");
     http.end();
-    return true;
+    return OTA_Result(true, "");
 }
