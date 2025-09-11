@@ -7,6 +7,7 @@
 #include <cfloat>
 #include "pch.h"
 #include "esp_attr.h"
+#include "sd-repository.h"
 // Temperatura e Humidade
 //DHT dht(DHTPIN, DHTTYPE);
 DHTesp dht;
@@ -16,6 +17,8 @@ Adafruit_BMP085 bmp;
 // Pluviometro
 volatile unsigned long lastPVLImpulseTime = 0;
 volatile unsigned int rainCounter = 0;
+float mm_per_tip = VOLUME_PLUVIOMETRO;
+
 
 // Anemometro (Velocidade do vento)
 volatile int anemometerCounter = 0;
@@ -23,6 +26,8 @@ volatile unsigned long lastVVTImpulseTime = 0;
 unsigned int gustIndex = 0;
 unsigned int previousCounter = 0;
 int rps[GUST_ARRAY_SIZE]{0};
+
+
 
 void IRAM_ATTR onAnemometerChange()
 {
@@ -70,13 +75,24 @@ void Sensors::init()
   attachInterrupt(digitalPinToInterrupt(PLV_PIN), onPluviometerChange, RISING);
   attachInterrupt(digitalPinToInterrupt(ANEMOMETER_PIN), onAnemometerChange, FALLING);
 
-
   logDebugln("Iniciando DHT");
   //dht.begin();
   dht.setup(DHTPIN, DHTesp::DHT22);
 
   logDebugln("Iniciando BMP");
   beginBMP();
+
+  StaticJsonDocument<512> doc;
+  DeserializationError error = loadJson(SD,"/parameters.txt",doc);
+  if (!error) 
+  {
+    if (doc.containsKey("plv"))
+    {
+      float val = doc["plv"].as<float>();
+      logDebugf("PLV value: %f\n",val);
+      mm_per_tip = val;
+    }
+  }
 }
 
 void Sensors::beginBMP()
@@ -169,7 +185,7 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
   m_Measurements.timestamp = timestamp;
   m_Measurements.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0); // m/s
   m_Measurements.wind_gust = WIND_GUST_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
-  m_Measurements.rain_acc = rainSnapshot * VOLUME_PLUVIOMETRO;
+  m_Measurements.rain_acc = rainSnapshot * mm_per_tip;
   m_Measurements.wind_dir = readWindDirection();
 
   float temperatura1, temperatura2;

@@ -84,12 +84,13 @@ void setup()
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
   logDebug("\n\nIniciando sensores ...\n");
-  sensores.init();
 
   pinMode(16, INPUT_PULLUP);
 
   logIt("\nIniciando cartão SD");
   initSdCard();
+  
+  sensores.init();
 
   logIt("\nCriando diretorios padrões");
   createDirectory("/metricas");
@@ -577,7 +578,6 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
 {
   logDebugln("exec MQTT cmd");
 
-  // Parse payload as JSON
   DynamicJsonDocument doc(1024 + 128); // Add some headroom
   DeserializationError error = deserializeJson(doc, payload, length);
   if (error)
@@ -598,49 +598,9 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
   {
     const char *cmd = docData["cmd"];
     if (strcmp(cmd, "update") == 0)
-    {
-      const char *url = docData["url"] | "";
-      const char *id = docData["id"] | "";
-      if (!id || !*id)
-        return;
-
-      logDebug("URL: ");
-      logDebugln(url);
-
-      // Send OTA start status
-      DynamicJsonDocument respStart(128);
-      respStart["id"] = id;
-      respStart["status"] = 1;
-      publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respStart.as<JsonObject>());
-
-      OTA_Result result = OTA::update(String(url));
-
-      // Ensure MQTT connection after OTA
-      if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
-      {
-        if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
-          mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
-      }
-
-      // Send OTA result status
-      // OTA status codes: 4 = failure, 2 = success
-      const int OTA_STATUS_FAILURE = 4;
-      const int OTA_STATUS_SUCCESS = 2;
-      DynamicJsonDocument respEnd(128);
-      respEnd["id"] = id;
-      respEnd["status"] = result ? OTA_STATUS_SUCCESS : OTA_STATUS_FAILURE;
-      
-      publishJsonResponse((sysReportMqttTopic + String("/OTA")).c_str(), respEnd.as<JsonObject>());
-
-      logDebugln("Update successful!");
-      logDebugln("Reiniciando");
-      delay(1500);
-      ESP.restart();
-    }
-    else
-    {
-      executeCommand(docData, sysReportMqttTopic.c_str());
-    }
+      docData["cmd"] = "u";
+    executeCommand(docData, sysReportMqttTopic.c_str());
+ 
   }
 }
 

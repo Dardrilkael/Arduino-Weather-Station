@@ -8,6 +8,8 @@ dist/
 __vm/
 
 **/build/
+
+**/compiled/
 .bin
 
 arduino/index/.theia/
