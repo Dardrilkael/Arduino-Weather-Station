@@ -236,7 +236,7 @@ void loop()
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
-
+  checkWifiReconnection(config.wifi_ssid, config.wifi_password);
   if (timerHealthCheck.check(now))
   {
 
@@ -248,16 +248,7 @@ void loop()
     healthCheck.timeRemaining = ((timerMain.lastTime + timerMain.interval - now) / 1000);
 
     digitalWrite(LED2, healthCheck.isWifiConnected);
-    if (!healthCheck.isWifiConnected)
-    {
-      logIt((formatedDateString + "  ").c_str(), true);
-      logIt(timeClient.getFormattedTime().c_str(), true);
-      logIt(": lp-wf-rcnt\n", true);
-      WiFi.disconnect(true, true);
-      delay(500);
-      WiFi.mode(WIFI_STA);
-      WiFi.begin(config.wifi_ssid, config.wifi_password);
-    }
+
     const char *hcCsv = parseHealthCheckData(healthCheck, 1);
 
     logDebugf("\n\nColetando dados, metricas em %d segundos ...", healthCheck.timeRemaining);

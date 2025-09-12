@@ -66,3 +66,41 @@ int connectNtp(const char *contextName)
   logDebugf("%s: Conectado com sucesso. \n", contextName);
   return 1;
 }
+
+void checkWifiReconnection(const char *ssid, const char *password)
+{
+  static unsigned long lastReconnectAttempt = 0;
+  static int retryCount = 0;
+  const unsigned long reconnectInterval = 30000; // 30 seconds
+
+  unsigned long now = millis();
+  wl_status_t status = WiFi.status();
+
+  // ✅ If connected, reset retry tracking
+  if (status == WL_CONNECTED)
+  {
+    retryCount = 0;
+    return;
+  }
+
+  // ⏳ Wait before retrying
+  if (now - lastReconnectAttempt < reconnectInterval)
+    return;
+
+  // 📝 Log the retry
+  logIt((formatedDateString + "  ").c_str(), true);
+  logIt(timeClient.getFormattedTime().c_str(), true);
+  logIt(": lp-wf-rcnt\n", true);
+
+
+  // 🔁 Attempt reconnect
+  WiFi.disconnect(false);  // keep credentials
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  lastReconnectAttempt = now;
+  retryCount++;
+
+  logIt((String("🔁 WiFi retry #") + retryCount).c_str(), true);
+}
+
