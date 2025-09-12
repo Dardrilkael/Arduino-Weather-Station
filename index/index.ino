@@ -3,9 +3,11 @@
 // Versão: 2.0.0 OTA;
 //.........................................................................................................................
 
+#include "pch.h"
 #include "constants.h"
 #include "data.h"
 #include "sd-repository.h"
+String formatedDateString = "";
 #include "integration.h"
 #include "Sensors.h"
 #include <stdio.h>
@@ -17,7 +19,6 @@
 #include "mqtt.h"
 #include "OTA.h"
 #include <ArduinoJson.h>
-#include "pch.h"
 #include <Base64.h>
 // -- WATCH-DOG
 
@@ -37,7 +38,6 @@ void convertTimeToLocaleDate(long timestamp);
 long startTime;
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
-String formatedDateString = "";
 bool isBeforeNoon = true;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 
@@ -50,8 +50,8 @@ MQTT mqttClient;
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
-
-void logIt(const std::string &message, bool store = false)
+//TODO fix log it fruin include in intgration.h also pch.h
+void logIt(const std::string &message, bool store)
 {
   logDebug(message.c_str());
   if (store == true)

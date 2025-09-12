@@ -18,7 +18,7 @@ WiFiUDP ntpUDP;
 // const char* ntpServer = "a.st1.ntp.br";
 const char *ntpServer = "br.pool.ntp.org";
 NTPClient timeClient(ntpUDP, ntpServer);
-
+void logIt(const std::string &message, bool store = false);
 /**** MQTT Client Initialisation Using WiFi Connection *****/
 
 unsigned long lastMsg = 0;
