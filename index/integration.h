@@ -71,7 +71,7 @@ void checkWifiReconnection(const char *ssid, const char *password)
 {
   static unsigned long lastReconnectAttempt = 0;
   static int retryCount = 0;
-  const unsigned long reconnectInterval = 30000; // 30 seconds
+  const unsigned long reconnectInterval = 60000; // 30 seconds
 
   unsigned long now = millis();
   wl_status_t status = WiFi.status();

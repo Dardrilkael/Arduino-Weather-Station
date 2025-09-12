@@ -28,7 +28,7 @@ constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 Timer timer100ms(100);
 Timer timerBackup(3600000); // 1 hour
 Timer timerMain(config.interval);
-Timer timerHealthCheck(5000);
+Timer timerHealthCheck(10000);
 
 bool sendCSVFile(File &file, const char *url, const char *id = "0");
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
