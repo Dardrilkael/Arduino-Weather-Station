@@ -1,8 +1,9 @@
 #pragma once
-#define FIRMWARE_VERSION "3.0.173"
+#define FIRMWARE_VERSION "3.0.174"
 #define UPDATE_URL
 #include <Arduino.h>
 #include <functional>
+#include <string>
 
 struct OTA_Result 
 {

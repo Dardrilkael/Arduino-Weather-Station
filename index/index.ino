@@ -72,7 +72,10 @@ void watchdogRTC()
 
 void setup()
 {
-  Serial.begin(115200);
+  #if DEBUG_LOG_ENABLED
+    Serial.begin(115200);
+  #endif
+
   // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   delay(3000);
   logIt("\n >> Sistema Integrado de meteorologia << \n");
@@ -175,6 +178,7 @@ void setup()
 int timestamp = 0;
 void loop()
 {
+  /*
   if (Serial.available())
   {
     char input = Serial.read();
@@ -185,7 +189,7 @@ void loop()
       ESP.restart();
     }
   }
-
+  */
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
   sensores.updateWindGust(now);
