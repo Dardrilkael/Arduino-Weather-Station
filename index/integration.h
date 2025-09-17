@@ -97,6 +97,7 @@ void checkWifiReconnection(const char *ssid, const char *password)
   WiFi.disconnect(false);  // keep credentials
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+  delay(3000);
 
   lastReconnectAttempt = now;
   retryCount++;

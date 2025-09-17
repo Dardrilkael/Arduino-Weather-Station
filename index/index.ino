@@ -178,6 +178,7 @@ void setup()
 int timestamp = 0;
 void loop()
 {
+  delay(100);
   /*
   if (Serial.available())
   {
