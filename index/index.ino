@@ -25,7 +25,7 @@ String formatedDateString = "";
 // Timing intervals in milliseconds
 constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
-Timer timer100ms(100);
+Timer timer100ms(500);
 Timer timerBackup(3600000); // 1 hour
 Timer timerMain(config.interval);
 Timer timerHealthCheck(10000);
@@ -48,6 +48,7 @@ String sysReportMqttTopic;
 // String softwareReleaseMqttTopic;,
 ModemAT modem;
 MQTT mqttClient(modem);
+NTP timeClient(modem, ntpServer);
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
@@ -128,14 +129,25 @@ void setup()
   int nivelDbm = WiFi.RSSI();
   storeLog((String(nivelDbm) + ";").c_str());
 
-  logIt("\n1.3 Estabelecendo conexão com NTP;", true);
-  connectNtp("  - NTP");
-
  // Setup network
     if (!modem.setupNetwork()) {
         Serial.println("Network setup failed!");
         return;
     }
+
+  logIt("\n1.3 Estabelecendo conexão com NTP;", true);
+
+  
+  logDebugf("%s: Estabelecendo conexão inicial\n", "NTP");
+  while (!timeClient.update())
+  {
+    logDebug(".");
+    delay(1000);
+  }
+  logDebugf("%s: Conectado com sucesso. \n", "NTP");
+
+
+
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
   mqttClient.setupMqtt("MQTTesp32", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
   mqttClient.setCallback(mqttSubCallback);
@@ -207,7 +219,7 @@ void loop()
   {
     if (!mqttClient.loopMqtt()) {
         Serial.println("MQTT connection lost, attempting reconnect...");
-        delay(5000);
+        
         
         if (mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic)) {
             Serial.println("✓ MQTT reconnected!");
@@ -257,7 +269,7 @@ void loop()
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
-  checkWifiReconnection(config.wifi_ssid, config.wifi_password);
+  //checkWifiReconnection(config.wifi_ssid, config.wifi_password);
   if (timerHealthCheck.check(now))
   {
 

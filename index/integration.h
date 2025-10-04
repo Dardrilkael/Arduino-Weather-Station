@@ -5,8 +5,8 @@
 
 #pragma once
 #include <WiFi.h> // #include <WiFiClientSecure.h>
-#include <NTPClient.h>
-
+//#include <NTPClient.h>
+#include "NTP.h"
 /**** WIFI Client Initialisation *****/
 WiFiClient wifiClient;
 
@@ -17,7 +17,7 @@ WiFiClient wifiClient;
 WiFiUDP ntpUDP;
 // const char* ntpServer = "a.st1.ntp.br";
 const char *ntpServer = "br.pool.ntp.org";
-NTPClient timeClient(ntpUDP, ntpServer);
+
 void logIt(const std::string &message, bool store = false);
 /**** MQTT Client Initialisation Using WiFi Connection *****/
 
@@ -51,22 +51,8 @@ int setupWifi(const char *contextName, char *ssid, char *password)
 }
 
 /* Ntp Client */
-int connectNtp(const char *contextName)
-{
-  logDebugf("%s: Estabelecendo conexão inicial\n", contextName);
 
-  timeClient.begin();
-
-  while (!timeClient.update())
-  {
-    logDebug(".");
-    delay(1000);
-  }
-
-  logDebugf("%s: Conectado com sucesso. \n", contextName);
-  return 1;
-}
-
+/*
 void checkWifiReconnection(const char *ssid, const char *password)
 {
   static unsigned long lastReconnectAttempt = 0;
@@ -104,4 +90,4 @@ void checkWifiReconnection(const char *ssid, const char *password)
 
   logIt((String("🔁 WiFi retry #") + retryCount).c_str(), true);
 }
-
+*/
