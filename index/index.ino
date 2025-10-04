@@ -45,8 +45,9 @@ struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 
 // -- MQTT
 String sysReportMqttTopic;
-// String softwareReleaseMqttTopic;
-MQTT mqttClient;
+// String softwareReleaseMqttTopic;,
+ModemAT modem;
+MQTT mqttClient(modem);
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
@@ -68,6 +69,52 @@ void watchdogRTC()
   rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT_MS); // timeout rtd_wdt 600000ms (10 minutes).
   rtc_wdt_enable();                                 // Start the RTC WDT timer
   rtc_wdt_protect_on();                             // Enable RTC WDT write protection
+}
+
+const char* apn = "zap.vivo.com.br";
+bool setupNetwork() {
+    bool success = true;
+    
+    // Initialize modem
+    if (!modem.begin()) {
+        Serial.println("Failed to initialize modem");
+        return false;
+    }
+    
+    // Check SIM
+    success &= modem.executeWithRetry([]() {
+        return modem.checkSim();
+    }, "SIM check");
+    
+    // Check network registration
+    if (success) {
+        success &= modem.executeWithRetry([]() {
+            return modem.checkNetworkRegistration(5);
+        }, "Network registration");
+    }
+    
+    // Configure PDP context
+    if (success) {
+        success &= modem.executeWithRetry([&]() {
+            return modem.configurePDPContext(apn);
+        }, "APN configuration");
+    }
+    
+    // Activate PDP context
+    if (success) {
+        success &= modem.executeWithRetry([]() {
+            return modem.activatePDPContext();
+        }, "PDP activation");
+    }
+    
+    // Get IP address
+    if (success) {
+        modem.executeWithRetry([]() {
+            return modem.getIPAddress();
+        }, "IP address check");
+    }
+    
+    return success;
 }
 
 void setup()
@@ -127,8 +174,14 @@ void setup()
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
   connectNtp("  - NTP");
 
+
+ // Setup network
+    if (!setupNetwork()) {
+        Serial.println("Network setup failed!");
+        return;
+    }
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
-  mqttClient.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+  mqttClient.setupMqtt("MQTTesp32", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
   mqttClient.setCallback(mqttSubCallback);
   mqttClient.setBufferSize(512);
   mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
@@ -196,7 +249,14 @@ void loop()
   sensores.updateWindGust(now);
   if (timer100ms.check(now))
   {
-    mqttClient.loopMqtt();
+    if (!mqttClient.loopMqtt()) {
+        Serial.println("MQTT connection lost, attempting reconnect...");
+        delay(5000);
+        
+        if (mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic)) {
+            Serial.println("✓ MQTT reconnected!");
+        }
+    }
     timestamp = timeClient.getEpochTime();
   }
 
@@ -544,7 +604,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     // Ensure MQTT connection after OTA
     if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
     {
-      if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
+      if (mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
         mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
 
