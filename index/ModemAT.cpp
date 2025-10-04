@@ -2,7 +2,7 @@
 #include "ModemAT.h"
 #include <Arduino.h>
 #include "settings.h"
-constexpr const char* apn = "zap.vivo.com.br";
+const char* apn = "zap.vivo.com.br";
 ModemAT::ModemAT(int rxPin, int txPin, long baudRate) 
     : rxPin(rxPin), txPin(txPin), baudRate(baudRate), 
       modemConnected(false), retryDelay(2000), serialAT(1) {

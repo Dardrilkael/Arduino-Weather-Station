@@ -71,51 +71,8 @@ void watchdogRTC()
   rtc_wdt_protect_on();                             // Enable RTC WDT write protection
 }
 
-const char* apn = "zap.vivo.com.br";
-bool setupNetwork() {
-    bool success = true;
-    
-    // Initialize modem
-    if (!modem.begin()) {
-        Serial.println("Failed to initialize modem");
-        return false;
-    }
-    
-    // Check SIM
-    success &= modem.executeWithRetry([]() {
-        return modem.checkSim();
-    }, "SIM check");
-    
-    // Check network registration
-    if (success) {
-        success &= modem.executeWithRetry([]() {
-            return modem.checkNetworkRegistration(5);
-        }, "Network registration");
-    }
-    
-    // Configure PDP context
-    if (success) {
-        success &= modem.executeWithRetry([&]() {
-            return modem.configurePDPContext(apn);
-        }, "APN configuration");
-    }
-    
-    // Activate PDP context
-    if (success) {
-        success &= modem.executeWithRetry([]() {
-            return modem.activatePDPContext();
-        }, "PDP activation");
-    }
-    
-    // Get IP address
-    if (success) {
-        modem.executeWithRetry([]() {
-            return modem.getIPAddress();
-        }, "IP address check");
-    }
-    
-    return success;
-}
+
+
 
 void setup()
 {
@@ -174,9 +131,8 @@ void setup()
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
   connectNtp("  - NTP");
 
-
  // Setup network
-    if (!setupNetwork()) {
+    if (!modem.setupNetwork()) {
         Serial.println("Network setup failed!");
         return;
     }
