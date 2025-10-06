@@ -125,7 +125,7 @@ void setup()
       ;
 
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
-  setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
+  //setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
   int nivelDbm = WiFi.RSSI();
   storeLog((String(nivelDbm) + ";").c_str());
 
