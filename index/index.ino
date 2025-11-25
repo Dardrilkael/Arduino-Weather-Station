@@ -20,6 +20,7 @@ String formatedDateString = "";
 #include "OTA.h"
 #include <ArduinoJson.h>
 #include <Base64.h>
+#include "esp_bt.h"
 // -- WATCH-DOG
 
 // Timing intervals in milliseconds
@@ -112,6 +113,7 @@ void setup()
     bluetoothName = "est000";
 
   logIt("\n1.1 Iniciando bluetooth;", true);
+  esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
   BLE::Init(bluetoothName, bluetoothController);
   BLE::updateValue(CONFIGURATION_UUID, jsonConfig);
 
@@ -119,6 +121,7 @@ void setup()
     while (!loadConfiguration(SD, configFileName, config, jsonConfig))
       ;
 
+  delay(100);
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
   setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
   int nivelDbm = WiFi.RSSI();

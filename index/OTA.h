@@ -1,5 +1,5 @@
 #pragma once
-#define FIRMWARE_VERSION "3.0.175"
+#define FIRMWARE_VERSION "3.0.176"
 #define UPDATE_URL
 #include <Arduino.h>
 #include <functional>
@@ -17,5 +17,5 @@ struct OTA_Result
 class OTA
 {
 public:
-  static OTA_Result update(const String &url,std::function<void(int)> onProgress = [](int){});
+  static OTA_Result update(const String &url, std::function<void(int)> onProgress = [](int){});
 };

@@ -43,7 +43,6 @@ class CharacteristicsCallback : public BLECharacteristicCallbacks
 
 void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std::string &content))
 {
-
     characteristicCB = callback;
 
     char boardOutputName[120]{0};
@@ -64,8 +63,8 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     pConfigCharacteristic = pService->createCharacteristic(
         CONFIGURATION_UUID,
         BLECharacteristic::PROPERTY_READ |
-            BLECharacteristic::PROPERTY_WRITE |
-            BLECharacteristic::PROPERTY_NOTIFY);
+        BLECharacteristic::PROPERTY_WRITE |
+        BLECharacteristic::PROPERTY_NOTIFY);
 
     pConfigCharacteristic->setValue("");
     pConfigCharacteristic->setCallbacks(new CharacteristicsCallback());

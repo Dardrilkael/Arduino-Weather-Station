@@ -7,7 +7,7 @@
 
 
 
-OTA_Result OTA::update(const String &url,std::function<void(int)> onProgress)
+OTA_Result OTA::update(const String &url, std::function<void(int)> onProgress)
 {
     logDebugln("Starting firmware update...");
 

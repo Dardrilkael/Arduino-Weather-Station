@@ -32,9 +32,9 @@ int setupWifi(const char *contextName, char *ssid, char *password)
   logDebugf("%s: Estabelecendo conexão inicial", contextName);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  WiFi.setAutoReconnect(true);
   // WiFi.persistent(true);
   //  secureWifiClient.setCACert(root_ca);    // enable this line and the the "certificate" code for secure connection
+  Serial.println("here wifi");
   while (WiFi.status() != WL_CONNECTED)
   {
     for (int i = 0; i < 5; i++)
