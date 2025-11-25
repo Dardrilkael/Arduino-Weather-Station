@@ -194,10 +194,10 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
 
 
     // Choose temperatura1 if it's valid, otherwise fallback to temperatura2
-  if (!isnan(temperatura1)) {
-    m_Measurements.temperature = temperatura1;
-  } else {
+  if (!isnan(temperatura2)) {
     m_Measurements.temperature = temperatura2;
+  } else {
+    m_Measurements.temperature = temperatura1;
   }
   
 
