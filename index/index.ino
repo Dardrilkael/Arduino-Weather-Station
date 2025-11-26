@@ -4,23 +4,25 @@
 //.........................................................................................................................
 
 #include "pch.h"
+#include <ArduinoJson.h>
+#include <rtc_wdt.h>
+#include <Base64.h>
+#include <esp_bt.h>
+#include <stdio.h>
+#include <string>
+#include <vector>
+
 #include "constants.h"
 #include "data.h"
 #include "sd-repository.h"
-String formatedDateString = "";
-#include "integration.h"
+#include "TimeManager.h"
+#include "WifiManager.h"
 #include "Sensors.h"
-#include <stdio.h>
 #include "esp_system.h"
 #include "bt-integration.h"
-#include <string>
-#include <vector>
-#include <rtc_wdt.h>
 #include "mqtt.h"
 #include "OTA.h"
-#include <ArduinoJson.h>
-#include <Base64.h>
-#include "esp_bt.h"
+
 // -- WATCH-DOG
 
 // Timing intervals in milliseconds
@@ -34,25 +36,27 @@ Timer timerHealthCheck(10000);
 bool sendCSVFile(File &file, const char *url, const char *id = "0");
 bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 int bluetoothController(const char *uid, const std::string &content);
-void convertTimeToLocaleDate(long timestamp);
+
 
 long startTime;
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
 bool isBeforeNoon = true;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
-
+String formatedDateString = "";
 // Define constant for wind gust calculation
 
 // -- MQTT
 String sysReportMqttTopic;
 // String softwareReleaseMqttTopic;
+WifiManager wifiClient; 
 MQTT mqttClient;
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
+
 //TODO fix log it fruin include in intgration.h also pch.h
-void logIt(const std::string &message, bool store)
+void logIt(const std::string &message, bool store = false)
 {
   logDebug(message.c_str());
   if (store == true)
@@ -123,12 +127,13 @@ void setup()
 
   delay(100);
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
-  setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
+  wifiClient.setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
   int nivelDbm = WiFi.RSSI();
   storeLog((String(nivelDbm) + ";").c_str());
 
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
-  connectNtp("  - NTP");
+  //connectNtp("  - NTP");
+  TimeManager::Init();
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
   mqttClient.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
@@ -147,11 +152,11 @@ void setup()
   // 2; Inicio
   logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
 
-  int setupTimestamp = timeClient.getEpochTime();
-  convertTimeToLocaleDate(setupTimestamp);
+  int setupTimestamp = TimeManager::getTimestamp();
+  formatedDateString = TimeManager::getFormatted(FMT_DATE);
 
-  String dataHora = String(formatedDateString) + "T" + timeClient.getFormattedTime();
-  storeLog(("\n" + dataHora + "\n").c_str());
+  
+  storeLog(TimeManager::getFormatted(FMT_FULL));
 
   // -- WATCH-DOG
   watchdogRTC();
@@ -200,7 +205,6 @@ void loop()
   if (timer100ms.check(now))
   {
     mqttClient.loopMqtt();
-    timestamp = timeClient.getEpochTime();
   }
 
   digitalWrite(LED1, LOW);
@@ -216,9 +220,9 @@ void loop()
 
     rtc_wdt_feed(); // -- WATCH-DOG
 
-    timeClient.update();
-    timestamp = timeClient.getEpochTime();
-    convertTimeToLocaleDate(timestamp);
+    TimeManager::update();
+    timestamp = TimeManager::getTimestamp();
+   formatedDateString = TimeManager::getFormatted(FMT_DATE);
 
     // Computando dados
 
@@ -244,10 +248,11 @@ void loop()
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
-  checkWifiReconnection(config.wifi_ssid, config.wifi_password);
+  wifiClient.checkWifiReconnection();
   if (timerHealthCheck.check(now))
   {
-
+    TimeManager::update();
+    timestamp = TimeManager::getTimestamp();
     // Health check
     healthCheck.timestamp = timestamp;
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
@@ -603,15 +608,4 @@ void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
   }
 }
 
-void convertTimeToLocaleDate(long timestamp)
-{
-  time_t t = (time_t)timestamp;
-  struct tm *ptm = gmtime(&t);
-  char dateBuffer[11];
-  int day = ptm->tm_mday;
-  int month = ptm->tm_mon + 1;
-  int year = ptm->tm_year + 1900;
-  isBeforeNoon = ptm->tm_hour < 12;
-  sprintf(dateBuffer, "%02d-%02d-%04d", day, month, year);
-  formatedDateString = String(dateBuffer);
-}
+

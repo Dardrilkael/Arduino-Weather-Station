@@ -1,5 +1,5 @@
 #pragma once
-#define FIRMWARE_VERSION "3.0.176"
+#define FIRMWARE_VERSION "3.0.177"
 #define UPDATE_URL
 #include <Arduino.h>
 #include <functional>
