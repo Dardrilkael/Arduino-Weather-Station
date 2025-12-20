@@ -20,8 +20,13 @@
 #include "Sensors.h"
 #include "esp_system.h"
 #include "bt-integration.h"
-#include "mqtt.h"
+
 #include "OTA.h"
+
+
+#include "ModemAT.h"
+#include "mqtt.h"
+#include "httpClient.h"
 
 // -- WATCH-DOG
 
@@ -29,7 +34,7 @@
 constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
 Timer timer100ms(100);
-Timer timerBackup(3600000); // 1 hour
+Timer timerBackup(25000); // 1 hour
 Timer timerMain(config.interval);
 Timer timerHealthCheck(10000);
 
@@ -49,12 +54,15 @@ String formatedDateString = "";
 // -- MQTT
 String sysReportMqttTopic;
 // String softwareReleaseMqttTopic;
-WifiManager wifiClient; 
-MQTT mqttClient;
+ModemAT modem(16, 17, 115200);
+MQTT mqttClient(modem);
+HttpClient http(modem);
+//NTP ntp(modem, "pool.ntp.org", 0);
+
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
-
+void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned int length);
 //TODO fix log it fruin include in intgration.h also pch.h
 void logIt(const std::string &message, bool store = false)
 {
@@ -75,6 +83,20 @@ void watchdogRTC()
   rtc_wdt_protect_on();                             // Enable RTC WDT write protection
 }
 
+bool syncClock()
+{
+    ATResponse resp = modem.sendCommand("AT+CCLK?", 5000);
+
+    for (int i = 0; i < resp.lineCount; i++)
+    {
+        if (resp.lines[i].startsWith("+CCLK:"))
+        {
+            return TimeManager::syncFromModemCCLK(resp.lines[i].c_str());
+        }
+    }
+    return false;
+}
+
 void setup()
 {
   #if DEBUG_LOG_ENABLED
@@ -91,7 +113,27 @@ void setup()
   digitalWrite(LED1, HIGH);
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
+
+  modem.begin();
+
+  start:
+    delay(300);
+    auto resp = modem.checkSim();
+    Serial.printf("O modem %s foi inicializado\n", resp ? "" : "nao");
+    if (!resp)
+        goto start;
+  
+  modem.setupNetwork("zap.vivo.com.br");
+  IPAddressView IP = modem.query<IPAddressView>("AT+CGPADDR=1");
+    Serial.printf("The newly found ip is: %s\n", IP.ip);
+
+    SignalQuality quality = modem.query<SignalQuality>("AT+CSQ");
+    quality.print();
+
+
+
   logDebug("\n\nIniciando sensores ...\n");
+
 
   pinMode(16, INPUT_PULLUP);
 
@@ -127,27 +169,35 @@ void setup()
 
   delay(100);
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
-  wifiClient.setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
+  //wifiClient.setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
   int nivelDbm = WiFi.RSSI();
   storeLog((String(nivelDbm) + ";").c_str());
 
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
   //connectNtp("  - NTP");
-  TimeManager::Init();
+  //TimeManager::Init();
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
   mqttClient.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+  delay(400);
   mqttClient.setCallback(mqttSubCallback);
-  mqttClient.setBufferSize(512);
-  mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+
+
+ 
+
+  
+  String mierda = (String("sys") + String(config.mqtt_topic));
+  mqttClient.subscribe(mierda.c_str());
+  
+    modem.addURCHandler([&](const String &line) -> bool
+                        { return mqttClient.processLine(line); });
+
   sysReportMqttTopic = (String("sys-report") + String(config.mqtt_topic));
 
   logIt("\n\n1.5 Iniciando controllers;", true);
 
   int now = millis();
-  // TODO its in sensors init now
-  // lastVVTImpulseTime = now;
-  // lastPVLImpulseTime = now;
+
 
   // 2; Inicio
   logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
@@ -186,7 +236,8 @@ void setup()
 int timestamp = 0;
 void loop()
 {
-  delay(100);
+  modem.pollURC();
+
   /*
   if (Serial.available())
   {
@@ -204,7 +255,7 @@ void loop()
   sensores.updateWindGust(now);
   if (timer100ms.check(now))
   {
-    mqttClient.loopMqtt();
+    //mqttClient.loopMqtt();
   }
 
   digitalWrite(LED1, LOW);
@@ -215,11 +266,11 @@ void loop()
   }
   if (timerMain.check(now))
   {
-
+    mqttClient.reconnect();
     digitalWrite(LED1, HIGH);
 
     rtc_wdt_feed(); // -- WATCH-DOG
-
+    syncClock();
     TimeManager::update();
     timestamp = TimeManager::getTimestamp();
    formatedDateString = TimeManager::getFormatted(FMT_DATE);
@@ -248,7 +299,7 @@ void loop()
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
-  wifiClient.checkWifiReconnection();
+  //wifiClient.checkWifiReconnection();
   if (timerHealthCheck.check(now))
   {
     TimeManager::update();
@@ -257,7 +308,7 @@ void loop()
     healthCheck.timestamp = timestamp;
     healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
     healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
-    healthCheck.isMqttConnected = mqttClient.loopMqtt();
+    healthCheck.isMqttConnected = false;//mqttClient.loopMqtt();
     healthCheck.timeRemaining = ((timerMain.lastTime + timerMain.interval - now) / 1000);
 
     digitalWrite(LED2, healthCheck.isWifiConnected);
@@ -273,9 +324,9 @@ void loop()
     //  Garantindo conexão com mqqt broker;
     if (healthCheck.isWifiConnected && !healthCheck.isMqttConnected)
     {
-      healthCheck.isMqttConnected = mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
-      if (healthCheck.isMqttConnected)
-        mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+     // healthCheck.isMqttConnected = mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
+     // if (healthCheck.isMqttConnected)
+     //   mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
     // Enviando dados de health check
     char mqttHealthCheck[100];
@@ -550,10 +601,10 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
         send(response); });
 
     // Ensure MQTT connection after OTA
-    if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
+    //if (healthCheck.isWifiConnected && !mqttClient.loopMqtt())
     {
-      if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
-        mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
+     // if (mqttClient.connectMqtt("\n  - MQTT2", config.mqtt_username, config.mqtt_password, config.mqtt_topic))
+    //    mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
 
     // Send OTA result status
@@ -578,7 +629,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
   }
 }
 
-void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
+void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned int length)
 {
   logDebugln("exec MQTT cmd");
 
