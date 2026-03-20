@@ -1,7 +1,8 @@
 #include "TimeManager.h"
 #include <string.h>
-
+#include "Arduino.h"
 #include "esp_sntp.h"
+#include "ModemAT.h"
 
 #if ESP_IDF_VERSION_MAJOR >= 5
 #include "esp_netif_sntp.h"
@@ -110,6 +111,69 @@ const char* TimeManager::getFormatted(TimeFormat type)
 }
 
 
+bool TimeManager::syncFromModemCCLK(const char* rawLine)
+{
+    // Expected: +CCLK: "25/11/26,07:56:37-12"
+    // Or:       +CCLK: "25/11/26,07:56:37+03"
+    // Or:       +CCLK: "25/11/26,07:56:37+054"  (=> +45 min)
+
+    int year, month, day, hour, minute, second;
+    char tz_sign;
+    int tz_quarters;
+
+    // Extract:  25/11/26,07:56:37-12
+    int qs = strstr(rawLine, "\"") - rawLine;          // first "
+    int qe = strrchr(rawLine, '\"') - rawLine;         // last "
+
+    if (qs < 0 || qe < 0 || qe <= qs) return false;
+
+    String ts = String(rawLine).substring(qs + 1, qe);
+
+    // Parse components
+    int parsed = sscanf(
+        ts.c_str(),
+        "%2d/%2d/%2d,%2d:%2d:%2d%c%2d",
+        &year, &month, &day,
+        &hour, &minute, &second,
+        &tz_sign, &tz_quarters
+    );
+
+    if (parsed != 8) {
+        Serial.println("⛔ Failed to parse CCLK");
+        return false;
+    }
+
+    // Convert modem's timezone quarters into minutes
+    int tz_offset_minutes = tz_quarters * 15;
+    if (tz_sign == '-') tz_offset_minutes = -tz_offset_minutes;
+
+    // Convert year YY -> YYYY
+    year += 2000;
+
+    // Build tm struct (local modem time)
+    struct tm t = {0};
+    t.tm_year = year - 1900;
+    t.tm_mon  = month - 1;
+    t.tm_mday = day;
+    t.tm_hour = hour;
+    t.tm_min  = minute;
+    t.tm_sec  = second;
+
+    // Convert to epoch using the modem's local timezone
+    time_t epoch = mktime(&t);
+
+    // Convert to UTC
+    epoch -= tz_offset_minutes * 60;
+
+    // Update ESP32 system clock
+    struct timeval tv = { epoch, 0 };
+    settimeofday(&tv, nullptr);
+
+    update();
+    return true;
+}
+
+
 
 int TimeManager::year()   { return timeData.timeinfo.tm_year + 1900; }
 int TimeManager::month()  { return timeData.timeinfo.tm_mon + 1; }
@@ -117,3 +181,7 @@ int TimeManager::day()    { return timeData.timeinfo.tm_mday; }
 int TimeManager::hour()   { return timeData.timeinfo.tm_hour; }
 int TimeManager::minute() { return timeData.timeinfo.tm_min; }
 int TimeManager::second() { return timeData.timeinfo.tm_sec; }
+
+
+
+

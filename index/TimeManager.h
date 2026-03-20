@@ -16,11 +16,14 @@ class TimeManager
   static void update();
   static time_t getTimestamp(); 
   static const char* getFormatted(TimeFormat type);
+  static bool syncFromModemCCLK(const char* rawLine);
   static int year();
   static int month();
   static int day(); 
   static int hour(); 
   static int minute();
   static int second();
+
+
   
 };

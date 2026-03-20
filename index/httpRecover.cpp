@@ -1,10 +1,12 @@
 #pragma once
 
 #include "pch.h"
-#include <HTTPClient.h>
+#include "httpClient.h"
 #include <WiFiClient.h>
 #include <SD.h>
 #include "data.h"
+extern HttpClient http;
+static fs::File* g_currentFile = nullptr;
 
 // --------------------------------------
 // Configurações
@@ -61,26 +63,24 @@ bool sendCSVFile(File &file, const char *url, const char *id) {
         if (file) file.close();
         return false;
     }
-
-    HTTPClient http;
-    if (!http.begin(url)) {
-        logDebugln("Failed to start HTTP connection");
-        file.close();
-        return false;
-    }
-
+    g_currentFile = &file;
+ http.setURL("http://metcolab.macae.ufrj.br/admin/admin/failures/upload");
     http.addHeader("Content-Type", getContentType(file.name()));
     http.addHeader("Connection", "close");
     http.addHeader("X-Filename", file.name());
     http.addHeader("X-Device-Name", String(config.station_name));
     http.addHeader("X-Cmd-Id", String(id));
 
+
+
     logDebugf("Uploading file %s to %s\n", file.name(), url);
-    int responseCode = http.sendRequest("POST", &file, file.size());
+    int responseCode =     http.postByParts([](size_t offset, uint8_t *buf, size_t len) -> int {    
+                    int n = g_currentFile->read(buf,len);
+                    return  n;       
+                }, (size_t)g_currentFile->size(),65000, httpCallback);
     logDebugf("HTTP response: %d\n", responseCode);
 
     file.close();
-    http.end();
 
     return responseCode > 0 && responseCode < 300;
 }
