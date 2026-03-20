@@ -91,7 +91,7 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     BLEDevice::startAdvertising();
 }
 
-void BLE::updateValue(const char *characteristicId, const std::string &newValue)
+void BLE::updateValue(const std::string & characteristicId, const std::string &newValue)
 {
     if (newValue.length() == 0)
         return;

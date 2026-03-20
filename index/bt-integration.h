@@ -10,6 +10,6 @@ class BLE
 {
 public:
   static void Init(const char *boardName, int (*callback)(const char *uid, const std::string &content));
-  static void updateValue(const char *characteristicId, const std::string &newValue);
+  static void updateValue(const std::string & characteristicId, const std::string &newValue);
   static bool stop();
 };
