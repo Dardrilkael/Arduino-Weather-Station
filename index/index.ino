@@ -30,7 +30,7 @@ constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
 Timer timer100ms(100);
 Timer timerBackup(3600000); // 1 hour
-Timer timerMain(config.interval);
+Timer timerMain(0);         // Fix #7: was Timer timerMain(config.interval) — config not loaded yet at global init, interval is always 0 here; set correctly in setup() below
 Timer timerHealthCheck(10000);
 
 bool sendCSVFile(File &file, const char *url, const char *id = "0");
@@ -152,7 +152,7 @@ void setup()
   // 2; Inicio
   logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
 
-  int setupTimestamp = TimeManager::getTimestamp();
+  time_t setupTimestamp = TimeManager::getTimestamp(); // Fix #4: was int — truncates 64-bit time_t
   formatedDateString = TimeManager::getFormatted(FMT_DATE);
 
   
@@ -169,7 +169,7 @@ void setup()
 
   logDebugln(reason);
   char jsonPayload[100]{0};
-  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
+  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lld,\"reason\":%i}", FIRMWARE_VERSION, (long long)setupTimestamp, reason); // Fix #4: was %lu with int
   mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
   // Inicialização dos timers com o tempo atual
@@ -183,7 +183,7 @@ void setup()
   timerHealthCheck.lastTime = startTime;
 }
 
-int timestamp = 0;
+time_t timestamp = 0; // Fix #4: was int — truncates 64-bit time_t
 void loop()
 {
   delay(100);
@@ -473,6 +473,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     {
       response["error"] = "no destination";
       send(response);
+      break; // Fix #3: was missing — execution fell through to SD.open() with an empty/invalid URL
     }
     File file = SD.open(filename);
     if (!file)
@@ -481,7 +482,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
       send(response);
       break;
     }
-
+    
     response["status"] = "single";
     response["sent"] = sendCSVFile(file, url, id);
     send(response);
