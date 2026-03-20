@@ -16,6 +16,7 @@ class TimeManager
   static void update();
   static time_t getTimestamp(); 
   static const char* getFormatted(TimeFormat type);
+  static bool isTimeSynced(); // true once NTP has provided a valid timestamp
   static int year();
   static int month();
   static int day(); 

@@ -1,3 +1,4 @@
+//#include "pch.h"
 #include "TimeManager.h"
 #include <string.h>
 
@@ -47,11 +48,20 @@ sntp_setservername(2, "time.google.com");
   setenv("TZ", tz, 1);
   tzset();
 
-  unsigned long start = nowMs();
-      while (!sntpSynced) {
-          vTaskDelay(pdMS_TO_TICKS(100));
-
+  // Block until NTP syncs. This is intentional: the watchdog is not armed
+  // yet at this point in setup(), so blocking here is safe. Proceeding
+  // without a valid timestamp would produce meaningless data records.
+  // Progress is logged every 5 s so the device doesn't appear frozen.
+  unsigned long lastLog = nowMs();
+  while (!sntpSynced) {
+      unsigned long now = nowMs();
+      if (now - lastLog >= 5000) {
+          //logDebugln("Waiting for NTP sync...");
+          lastLog = now;
       }
+      vTaskDelay(pdMS_TO_TICKS(100));
+  }
+  //logDebugln("NTP sync OK.");
   update();
 }
 
@@ -110,6 +120,8 @@ const char* TimeManager::getFormatted(TimeFormat type)
 }
 
 
+
+bool TimeManager::isTimeSynced() { return sntpSynced; }
 
 int TimeManager::year()   { return timeData.timeinfo.tm_year + 1900; }
 int TimeManager::month()  { return timeData.timeinfo.tm_mon + 1; }
