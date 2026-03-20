@@ -1,5 +1,3 @@
-#pragma once
-
 #include "pch.h"
 #include <HTTPClient.h>
 #include <WiFiClient.h>

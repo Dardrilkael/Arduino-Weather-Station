@@ -1,4 +1,3 @@
-#pragma once
 #include "sd-repository.h"
 #include "xtensa/hal.h"
 #include "pch.h"
