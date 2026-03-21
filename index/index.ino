@@ -349,7 +349,7 @@ void sendFileChunks(const char *path, const char *fileMqqtTopic, const char *id)
   }
 
   size_t fileSize = file.size();
-  size_t chunkSize = 256;
+  constexpr size_t chunkSize = 256; // Fix: was size_t (runtime var) → char data[chunkSize] was a VLA, non-standard C++ and unsafe on stack
   size_t totalChunks = (fileSize + chunkSize - 1) / chunkSize;
   size_t chunkNum = 0;
 
@@ -562,10 +562,18 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     response["message"] = result.error.c_str();
     send(response);
 
-    logDebugln("Update successful!");
-    logDebugln("Reiniciando");
-    delay(1500);
-    ESP.restart();
+    if (result.success)
+    {
+      // Fix #3: was always restarting — a failed update would reboot into
+      // corrupt/incomplete firmware. Only restart when update succeeded.
+      logDebugln("Update successful! Reiniciando...");
+      delay(1500);
+      ESP.restart();
+    }
+    else
+    {
+      logDebugf("OTA failed: %s — keeping current firmware.\n", result.error.c_str());
+    }
     break;
   }
   default:
