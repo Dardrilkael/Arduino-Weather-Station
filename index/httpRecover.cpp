@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "httpRecover.h"
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <SD.h>

@@ -22,6 +22,7 @@
 #include "bt-integration.h"
 #include "mqtt.h"
 #include "OTA.h"
+#include "httpRecover.h" // Fix #6: was two hidden forward declarations in this file
 
 // -- WATCH-DOG
 
@@ -33,27 +34,20 @@ Timer timerBackup(3600000); // 1 hour
 Timer timerMain(0);         // Fix #7: was Timer timerMain(config.interval) — config not loaded yet at global init, interval is always 0 here; set correctly in setup() below
 Timer timerHealthCheck(10000);
 
-bool sendCSVFile(File &file, const char *url, const char *id = "0");
-bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 int bluetoothController(const char *uid, const std::string &content);
 
 
 unsigned long startTime; // Fix: was long — millis() returns unsigned long; signed wraps at ~25 days
-int timeRemaining = 0;
 std::string jsonConfig = "{}";
-bool isBeforeNoon = true;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 String formatedDateString = "";
 // Define constant for wind gust calculation
 
 // -- MQTT
 String sysReportMqttTopic;
-// String softwareReleaseMqttTopic;
-WifiManager wifiClient; 
+WifiManager wifiClient;
 MQTT mqttClient;
 Sensors sensores;
-// -- Novo
-int wifiDisconnectCount = 0;
 
 //TODO fix log it fruin include in intgration.h also pch.h
 void logIt(const std::string &message, bool store)
@@ -169,7 +163,9 @@ void setup()
 
   logDebugln(reason);
   char jsonPayload[100]{0};
-  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lld,\"reason\":%i}", FIRMWARE_VERSION, (long long)setupTimestamp, reason); // Fix #4: was %lu with int
+  snprintf(jsonPayload, sizeof(jsonPayload),
+           "{\"version\":\"%s\",\"timestamp\":%lld,\"reason\":%i}",
+           FIRMWARE_VERSION, (long long)setupTimestamp, reason);
   mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
   // Inicialização dos timers com o tempo atual
@@ -279,7 +275,11 @@ void loop()
     }
     // Enviando dados de health check
     char mqttHealthCheck[100];
-    sprintf(mqttHealthCheck, "{\"timestamp\":%lu,\"wifiDBM\":\"%i\"}", timestamp, WiFi.RSSI());
+    // Fix #4: was sprintf (no bounds check) + %lu (wrong for time_t).
+    // snprintf prevents overflow if template ever grows; %lld matches time_t.
+    snprintf(mqttHealthCheck, sizeof(mqttHealthCheck),
+             "{\"timestamp\":%lld,\"wifiDBM\":\"%i\"}",
+             (long long)timestamp, WiFi.RSSI());
     mqttClient.publish((sysReportMqttTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1); // retained
   }
 }

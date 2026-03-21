@@ -49,7 +49,7 @@ struct Metrics
 
 extern char metricsjsonOutput[240];
 extern char metricsCsvOutput[240];
-extern char csvHeader[200];
+
 
 void parseData(const Metrics &metric);
 

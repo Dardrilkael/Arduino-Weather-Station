@@ -38,7 +38,6 @@ Metrics Data;
 
 char metricsjsonOutput[240]{0};
 char metricsCsvOutput[240]{0};
-char csvHeader[200]{0};
 
 // Helper: writes a float as "null" or a decimal string into buf.
 // Uses dtostrf to avoid temporary String objects.
