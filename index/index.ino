@@ -38,7 +38,7 @@ bool processFiles(const char *dirPath, const char *todayDateString = nullptr, in
 int bluetoothController(const char *uid, const std::string &content);
 
 
-long startTime;
+unsigned long startTime; // Fix: was long — millis() returns unsigned long; signed wraps at ~25 days
 int timeRemaining = 0;
 std::string jsonConfig = "{}";
 bool isBeforeNoon = true;
@@ -144,7 +144,7 @@ void setup()
 
   logIt("\n\n1.5 Iniciando controllers;", true);
 
-  int now = millis();
+  unsigned long now = millis(); // Fix: was int — millis() returns unsigned long
   // TODO its in sensors init now
   // lastVVTImpulseTime = now;
   // lastPVLImpulseTime = now;
@@ -482,7 +482,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
       send(response);
       break;
     }
-    
+
     response["status"] = "single";
     response["sent"] = sendCSVFile(file, url, id);
     send(response);
