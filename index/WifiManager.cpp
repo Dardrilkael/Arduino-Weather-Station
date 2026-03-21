@@ -2,7 +2,6 @@
 #include "constants.h"
 #include "WifiManager.h"
 #include "TimeManager.h"
-
 WifiManager::WifiManager()
 {
     lastReconnectAttempt = 0;

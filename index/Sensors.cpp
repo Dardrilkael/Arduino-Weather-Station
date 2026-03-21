@@ -156,15 +156,21 @@ void Sensors::readBMP(float &press, float &temp)
   }
 }
 
-void Sensors::updateWindGust(unsigned int now)
+void Sensors::updateWindGust(unsigned long now) // Fix #2: was unsigned int — truncates unsigned long from millis()
 {
-  static unsigned int lastAssignement = 0;
+  static unsigned long lastAssignement = 0; // Fix #2: was unsigned int
 
-  int gustInterval = now - lastAssignement;
+  unsigned long gustInterval = now - lastAssignement;
   if (gustInterval >= 3000)
   {
     lastAssignement = now;
-    int snapshot = anemometerCounter; // Safe copy
+
+    // Fix #1: was reading volatile anemometerCounter without interrupt guard —
+    // ISR could fire mid-read and corrupt the snapshot value.
+    noInterrupts();
+    int snapshot = anemometerCounter;
+    interrupts();
+
     int revolutions = snapshot - previousCounter;
     previousCounter = snapshot;
 
