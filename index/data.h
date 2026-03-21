@@ -32,7 +32,10 @@ struct HealthCheck
 
 extern char hcJsonOutput[240];
 extern char hcCsvOutput[240];
+// type=1 → CSV into hcCsvOutput, else → JSON into hcJsonOutput.
+// Returns pointer to whichever buffer was written.
 const char *parseHealthCheckData(HealthCheck hc, int type = 1);
+
 // --- Metrics data  ---
 
 struct Metrics
@@ -47,11 +50,12 @@ struct Metrics
   float pressure = 0;
 };
 
-extern char metricsjsonOutput[240];
-extern char metricsCsvOutput[240];
-
-
-void parseData(const Metrics &metric);
+// Fix #8: was writing to hidden globals metricsjsonOutput / metricsCsvOutput.
+// Caller now passes explicit output buffers — no silent side effects,
+// safe to call from multiple contexts (BLE callback, MQTT callback, loop).
+void parseData(const Metrics &metric,
+               char *jsonOut, size_t jsonSize,
+               char *csvOut,  size_t csvSize);
 
 struct Timer
 {
