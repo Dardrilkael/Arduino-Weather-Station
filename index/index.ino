@@ -56,7 +56,7 @@ Sensors sensores;
 int wifiDisconnectCount = 0;
 
 //TODO fix log it fruin include in intgration.h also pch.h
-void logIt(const std::string &message, bool store = false)
+void logIt(const std::string &message, bool store)
 {
   logDebug(message.c_str());
   if (store == true)
