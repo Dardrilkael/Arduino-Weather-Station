@@ -189,8 +189,8 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
   interrupts();
 
   m_Measurements.timestamp = timestamp;
-  m_Measurements.wind_speed = 3.052 * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0); // m/s
-  m_Measurements.wind_gust = WIND_GUST_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
+  m_Measurements.wind_speed = ANEMOMETER_CALIBRATION_FACTOR * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0); // m/s
+  m_Measurements.wind_gust = WIND_GUST_CALIBRATION_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
   m_Measurements.rain_acc = rainSnapshot * mm_per_tip;
   m_Measurements.wind_dir = readWindDirection();
 
