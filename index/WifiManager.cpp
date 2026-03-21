@@ -2,7 +2,7 @@
 #include "constants.h"
 #include "WifiManager.h"
 #include "TimeManager.h"
-void logIt(const std::string &message, bool store = false);
+
 WifiManager::WifiManager()
 {
     lastReconnectAttempt = 0;
