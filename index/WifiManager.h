@@ -10,8 +10,7 @@ public:
     void checkWifiReconnection();
 
 private:
-    WiFiClient wifiClient;
-    
+    // WiFiClient removed — was never used here; MQTT creates its own in mqtt.cpp
     unsigned long lastReconnectAttempt;
     int retryCount;
 
@@ -19,5 +18,3 @@ private:
     std::string savedSSID;
     std::string savedPassword;
 };
-
-
