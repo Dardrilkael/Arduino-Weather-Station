@@ -277,14 +277,52 @@ bool loadConfiguration(fs::FS & fs, const char *filename, Config &config, std::s
     return buffer;
   }
 
-  // Adiciona uma nova linha de metricas
-  void storeLog(const char *payload)
+// Log write buffer — accumulates messages in RAM and only opens the SD file
+// when the buffer is full or flushLog() is called explicitly.
+// Fix #9: was opening and closing the file on every single storeLog() call —
+// slow (SD open ~5-10ms each) and causes unnecessary write cycles on the card.
+#define LOG_BUFFER_SIZE 512
+static char logBuffer[LOG_BUFFER_SIZE]{0};
+static size_t logBufferLen = 0;
+
+static void writeLogBuffer()
+{
+  if (logBufferLen == 0) return;
+  File file = SD.open("/logs/boot.txt", FILE_APPEND);
+  if (file)
   {
-    String path = "/logs/boot.txt";
-    File file = SD.open(path, FILE_APPEND);
-    if (file)
-    {
-      file.print(payload);
-    }
+    file.write((const uint8_t *)logBuffer, logBufferLen);
     file.close();
   }
+  logBuffer[0] = '\0';
+  logBufferLen = 0;
+}
+
+void storeLog(const char *payload)
+{
+  if (!payload) return;
+  size_t payloadLen = strlen(payload);
+
+  // If payload alone exceeds buffer, flush current buffer then write directly
+  if (payloadLen >= LOG_BUFFER_SIZE)
+  {
+    writeLogBuffer();
+    File file = SD.open("/logs/boot.txt", FILE_APPEND);
+    if (file) { file.print(payload); file.close(); }
+    return;
+  }
+
+  // If payload won't fit in remaining buffer space, flush first
+  if (logBufferLen + payloadLen >= LOG_BUFFER_SIZE)
+    writeLogBuffer();
+
+  memcpy(logBuffer + logBufferLen, payload, payloadLen);
+  logBufferLen += payloadLen;
+  logBuffer[logBufferLen] = '\0';
+}
+
+// Call before restart, sleep, or any point where buffered logs must be saved.
+void flushLog()
+{
+  writeLogBuffer();
+}

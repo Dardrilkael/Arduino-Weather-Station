@@ -35,4 +35,5 @@ const char *listDirectory(File & dir, size_t limit);
 const char *readFileLimited(File & file, size_t limit, bool allign);
 
 void storeLog(const char *payload);
- 
+// Flushes buffered log data to SD. Call before restart or sleep.
+void flushLog();

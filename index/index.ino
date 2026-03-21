@@ -294,6 +294,7 @@ int bluetoothController(const char *uid, const std::string &content)
   {
     logIt("Reiniciando Arduino a força;", true);
     delay(2000);
+    flushLog();
     ESP.restart();
     return 1;
   }
@@ -310,6 +311,7 @@ int bluetoothController(const char *uid, const std::string &content)
     delay(2000);
     createFile(SD, "/config.txt", content.c_str());
     logIt("Reiniciando Arduino a força;", true);
+    flushLog();
     ESP.restart();
     return 1;
   }
@@ -416,6 +418,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     response["message"] = "Restarting ESP32";
     send(response);
     delay(100); // Allow MQTT to send
+    flushLog();
     ESP.restart();
     break;
   }
@@ -567,6 +570,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
       // Fix #3: was always restarting — a failed update would reboot into
       // corrupt/incomplete firmware. Only restart when update succeeded.
       logDebugln("Update successful! Reiniciando...");
+      flushLog();
       delay(1500);
       ESP.restart();
     }
