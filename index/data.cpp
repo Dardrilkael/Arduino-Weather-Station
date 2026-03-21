@@ -23,12 +23,12 @@ const char *parseHealthCheckData(HealthCheck hc, int type)
   }
   else
   {
-    const char *json_template = "{\"isWifiConnected\": %d, \"isMqttConnected\": %d, \"wifiDbmLevel\": %i, \"timestamp\": %i}";
+    const char *json_template = "{\"isWifiConnected\": %d, \"isMqttConnected\": %d, \"wifiDbmLevel\": %i, \"timestamp\": %lld}";
     sprintf(hcJsonOutput, json_template,
             hc.isWifiConnected ? 1 : 0,
             hc.isMqttConnected ? 1 : 0,
             hc.wifiDbmLevel,
-            hc.timestamp);
+            (long long)hc.timestamp);
     return hcJsonOutput;
   }
 }
@@ -61,9 +61,9 @@ void parseData(const Metrics &metric)
   const char *presStr = floatOrNull(metric.pressure,    presBuf, sizeof(presBuf));
 
   // parse measurements data to json
-  const char *json_template = "{\"timestamp\": %i, \"temperatura\": %s, \"umidade_ar\": %s, \"velocidade_vento\": %.2f, \"rajada_vento\": %.2f, \"dir_vento\": %d, \"volume_chuva\": %.2f, \"pressao\": %s, \"uid\": \"%s\", \"identidade\": \"%s\"}";
+  const char *json_template = "{\"timestamp\": %lld, \"temperatura\": %s, \"umidade_ar\": %s, \"velocidade_vento\": %.2f, \"rajada_vento\": %.2f, \"dir_vento\": %d, \"volume_chuva\": %.2f, \"pressao\": %s, \"uid\": \"%s\", \"identidade\": \"%s\"}";
   sprintf(metricsjsonOutput, json_template,
-          metric.timestamp,
+          (long long)metric.timestamp,
           tempStr,
           humStr,
           metric.wind_speed,
@@ -75,9 +75,9 @@ void parseData(const Metrics &metric)
           config.station_name);
 
   // parse measurement data to csv
-  const char *csv_template = "%i,%s,%s,%.2f,%.2f,%d,%.2f,%s,%s,%s\n";
+  const char *csv_template = "%lld,%s,%s,%.2f,%.2f,%d,%.2f,%s,%s,%s\n";
   sprintf(metricsCsvOutput, csv_template,
-          metric.timestamp,
+          (long long)metric.timestamp,
           tempStr,
           humStr,
           metric.wind_speed,

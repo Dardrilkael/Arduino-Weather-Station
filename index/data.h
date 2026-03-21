@@ -1,4 +1,5 @@
 #pragma once
+#include <time.h>  // for time_t
 // --- Config data  ---
 struct Config
 {
@@ -22,7 +23,7 @@ extern const char *configFileName;
 struct HealthCheck
 {
   const char *softwareVersion;
-  int timestamp;
+  time_t timestamp;   // Fix: was int — truncates 64-bit time_t on ESP-IDF 5.x
   bool isWifiConnected;
   bool isMqttConnected;
   int wifiDbmLevel;
@@ -36,7 +37,7 @@ const char *parseHealthCheckData(HealthCheck hc, int type = 1);
 
 struct Metrics
 {
-  long timestamp = 0;
+  time_t timestamp = 0;  // Fix: was long — truncates 64-bit time_t on ESP-IDF 5.x
   int wind_dir = -1;
   float wind_speed = 0;
   float wind_gust = 0;
