@@ -1,7 +1,7 @@
 //#include "pch.h"
 #include "TimeManager.h"
 #include <string.h>
-
+#include "Arduino.h"
 #include "esp_sntp.h"
 
 #if ESP_IDF_VERSION_MAJOR >= 5

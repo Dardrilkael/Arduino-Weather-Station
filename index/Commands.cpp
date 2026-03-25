@@ -256,7 +256,7 @@ void executeCommand(JsonObject &docData, const char *replyTopic)
   }
 }
 
-void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length)
+void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned int length)
 {
   logDebugln("exec MQTT cmd");
 

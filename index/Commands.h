@@ -24,4 +24,4 @@ void sendFileChunks(const char *path, const char *fileMqttTopic, const char *id)
 void executeCommand(JsonObject &docData, const char *replyTopic);
 
 // MQTT subscription callback — parses payload and dispatches to executeCommand
-void mqttSubCallback(char *topic, unsigned char *payload, unsigned int length);
+void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned int length);

@@ -11,7 +11,7 @@ public:
     bool connectMqtt(const char *contextName, const char *mqtt_username, const char *mqtt_password, const char *mqtt_topic);
     bool setupMqtt(const char *contextName, const char *mqtt_server, int mqtt_port, const char *mqtt_username, const char *mqtt_password, const char *mqtt_topic);
     bool loopMqtt();
-    void setCallback(void (*callback)(char *, unsigned char *, unsigned int));
+    void setCallback(void (*callback)(const char *, const unsigned char *, unsigned int));
     void setBufferSize(int size);
     bool subscribe(const char *mqtt_topic);
     bool beginPublish(const char *topic, unsigned int plength, bool retained = false);

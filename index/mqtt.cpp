@@ -73,7 +73,7 @@ bool MQTT::subscribe(const char *mqtt_topic)
   return m_Client->subscribe(mqtt_topic);
 }
 
-void MQTT::setCallback(void (*callback)(char *, unsigned char *, unsigned int))
+void MQTT::setCallback(void (*callback)(const char *, const unsigned char *, unsigned int))
 {
   m_Client->setCallback(callback);
 }
