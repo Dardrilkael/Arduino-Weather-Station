@@ -1,5 +1,3 @@
-
-#pragma once
 #include "esp_system.h"
 #include "bt-integration.h"
 #include <iostream>
@@ -14,6 +12,7 @@ BLECharacteristic *pHealthCharacteristic = nullptr;
 
 bool deviceConnected = false;
 int (*characteristicCB)(const char *uid, const std::string &content);
+
 class ServerCallbacks : public BLEServerCallbacks
 {
     void onConnect(BLEServer *pServer)
@@ -34,10 +33,13 @@ class CharacteristicsCallback : public BLECharacteristicCallbacks
     void onWrite(BLECharacteristic *pCharacteristic)
     {
         std::string rxValue = std::string(pCharacteristic->getValue().c_str());
-        const char *characteristicUid = pCharacteristic->getUUID().toString().c_str();
         if (rxValue.empty() || !characteristicCB)
             return;
-        characteristicCB(characteristicUid, rxValue);
+        // Fix #2: store the String before calling .c_str() — the temporary
+        // returned by toString() was destroyed before sprintf/callback could
+        // read the pointer, causing a dangling-pointer / UB crash.
+        std::string characteristicUid = pCharacteristic->getUUID().toString().c_str();
+        characteristicCB(characteristicUid.c_str(), rxValue);
     }
 };
 
@@ -91,19 +93,19 @@ void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std
     BLEDevice::startAdvertising();
 }
 
-void BLE::updateValue(const char *characteristicId, const std::string &newValue)
+void BLE::updateValue(const std::string &characteristicId, const std::string &newValue)
 {
     if (newValue.length() == 0)
         return;
     std::cout << "\n  - Emitindo valores via Bluetooth (" << newValue << ") \n";
     if (characteristicId == HEALTH_CHECK_UUID)
     {
-        pHealthCharacteristic->setValue((newValue.c_str()));
+        pHealthCharacteristic->setValue(newValue.c_str());
         pHealthCharacteristic->notify();
     }
     else if (characteristicId == CONFIGURATION_UUID)
     {
-        pConfigCharacteristic->setValue((newValue.c_str()));
+        pConfigCharacteristic->setValue(newValue.c_str());
         pConfigCharacteristic->notify();
     }
     else

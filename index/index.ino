@@ -6,81 +6,74 @@
 #include "pch.h"
 #include <ArduinoJson.h>
 #include <rtc_wdt.h>
-#include <Base64.h>
 #include <esp_bt.h>
 #include <stdio.h>
 #include <string>
-#include <vector>
 
 #include "constants.h"
 #include "data.h"
 #include "sd-repository.h"
 #include "TimeManager.h"
-#include "WifiManager.h"
+//#include "WifiManager.h"
+
 #include "Sensors.h"
 #include "esp_system.h"
 #include "bt-integration.h"
 
 #include "OTA.h"
-
+#include "base64.h"
+#include "Commands.h"
 
 #include "ModemAT.h"
 #include "mqtt.h"
 #include "httpClient.h"
 
+static constexpr int   RX_PIN    = 16;
+static constexpr int   TX_PIN    = 17;
+static constexpr ulong BAUD_RATE = 115200;
 // -- WATCH-DOG
 
 // Timing intervals in milliseconds
 constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
 Timer timer100ms(100);
-Timer timerBackup(25000); // 1 hour
+Timer timerBackup(3600000); // 1 hour
 Timer timerMain(config.interval);
 Timer timerHealthCheck(10000);
 
-bool sendCSVFile(File &file, const char *url, const char *id = "0");
-bool processFiles(const char *dirPath, const char *todayDateString = nullptr, int amount = 1);
 int bluetoothController(const char *uid, const std::string &content);
 
-
-long startTime;
-int timeRemaining = 0;
+unsigned long startTime;
 std::string jsonConfig = "{}";
-bool isBeforeNoon = true;
 struct HealthCheck healthCheck = {FIRMWARE_VERSION, 0, false, false, 0, 0};
 String formatedDateString = "";
-// Define constant for wind gust calculation
 
-// -- MQTT
 String sysReportMqttTopic;
-// String softwareReleaseMqttTopic;
+
 ModemAT modem(16, 17, 115200);
 MQTT mqttClient(modem);
 HttpClient http(modem);
-//NTP ntp(modem, "pool.ntp.org", 0);
 
 Sensors sensores;
 // -- Novo
 int wifiDisconnectCount = 0;
-void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned int length);
+
 //TODO fix log it fruin include in intgration.h also pch.h
-void logIt(const std::string &message, bool store = false)
+void logIt(const std::string &message, bool store)
 {
   logDebug(message.c_str());
-  if (store == true)
-  {
+  if (store)
     storeLog(message.c_str());
-  }
 }
 
 void watchdogRTC()
 {
-  rtc_wdt_protect_off(); // Disable RTC WDT write protection
+  rtc_wdt_protect_off();
   rtc_wdt_disable();
   rtc_wdt_set_stage(RTC_WDT_STAGE0, RTC_WDT_STAGE_ACTION_RESET_RTC);
-  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT_MS); // timeout rtd_wdt 600000ms (10 minutes).
-  rtc_wdt_enable();                                 // Start the RTC WDT timer
-  rtc_wdt_protect_on();                             // Enable RTC WDT write protection
+  rtc_wdt_set_time(RTC_WDT_STAGE0, WDT_TIMEOUT_MS);
+  rtc_wdt_enable();
+  rtc_wdt_protect_on();
 }
 
 bool syncClock()
@@ -103,7 +96,6 @@ void setup()
     Serial.begin(115200);
   #endif
 
-  // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
   delay(3000);
   logIt("\n >> Sistema Integrado de meteorologia << \n");
 
@@ -114,7 +106,9 @@ void setup()
   digitalWrite(LED2, LOW);
   digitalWrite(LED3, LOW);
 
-  modem.begin();
+
+
+    modem.begin();
 
   start:
     delay(300);
@@ -130,33 +124,23 @@ void setup()
     SignalQuality quality = modem.query<SignalQuality>("AT+CSQ");
     quality.print();
 
-
-
   logDebug("\n\nIniciando sensores ...\n");
-
-
   pinMode(16, INPUT_PULLUP);
 
   logIt("\nIniciando cartão SD");
   initSdCard();
-  
   sensores.init();
 
   logIt("\nCriando diretorios padrões");
   createDirectory("/metricas");
   createDirectory("/logs");
 
-  logDebugf("\n - Carregando variáveis de ambiente");
   logIt("\n1. Estação iniciada: ", true);
   esp_reset_reason_t reason = esp_reset_reason();
   logIt(String(reason).c_str(), true);
 
   bool loadedSD = loadConfiguration(SD, configFileName, config, jsonConfig);
-  const char *bluetoothName = nullptr;
-  if (loadedSD)
-    bluetoothName = config.station_name;
-  else
-    bluetoothName = "est000";
+  const char *bluetoothName = loadedSD ? config.station_name : "est000";
 
   logIt("\n1.1 Iniciando bluetooth;", true);
   esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
@@ -170,12 +154,12 @@ void setup()
   delay(100);
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
   //wifiClient.setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
-  int nivelDbm = WiFi.RSSI();
-  storeLog((String(nivelDbm) + ";").c_str());
+  //int nivelDbm = WiFi.RSSI();
+  //storeLog((String(nivelDbm) + ";").c_str());
 
   logIt("\n1.3 Estabelecendo conexão com NTP;", true);
   //connectNtp("  - NTP");
-  //TimeManager::Init();
+  TimeManager::Init();
 
   logIt("\n1.4 Estabelecendo conexão com MQTT;", true);
   mqttClient.setupMqtt("  - MQTT", config.mqtt_server, config.mqtt_port, config.mqtt_username, config.mqtt_password, config.mqtt_topic);
@@ -196,19 +180,10 @@ void setup()
 
   logIt("\n\n1.5 Iniciando controllers;", true);
 
-  int now = millis();
-
-
-  // 2; Inicio
-  logDebugf("\n >> PRIMEIRA ITERAÇÃO\n");
-
-  int setupTimestamp = TimeManager::getTimestamp();
+  time_t setupTimestamp = TimeManager::getTimestamp();
   formatedDateString = TimeManager::getFormatted(FMT_DATE);
-
-  
   storeLog(TimeManager::getFormatted(FMT_FULL));
 
-  // -- WATCH-DOG
   watchdogRTC();
 
   for (int i = 0; i < 7; i++)
@@ -219,25 +194,27 @@ void setup()
 
   logDebugln(reason);
   char jsonPayload[100]{0};
-  sprintf(jsonPayload, "{\"version\":\"%s\",\"timestamp\":%lu,\"reason\":%i}", FIRMWARE_VERSION, setupTimestamp, reason);
+  snprintf(jsonPayload, sizeof(jsonPayload),
+           "{\"version\":\"%s\",\"timestamp\":%lld,\"reason\":%i}",
+           FIRMWARE_VERSION, (long long)setupTimestamp, reason);
   mqttClient.publish((sysReportMqttTopic + String("/handshake")).c_str(), jsonPayload, 1);
 
-  // Inicialização dos timers com o tempo atual
-  startTime = millis(); // marca o momento de referência
-
+  startTime = millis();
   timerMain.interval = config.interval;
   timerMain.lastTime = startTime;
-
   timer100ms.lastTime = startTime;
   timerBackup.lastTime = startTime - timerBackup.interval;
   timerHealthCheck.lastTime = startTime;
 }
 
-int timestamp = 0;
+time_t timestamp = 0;
+// Output buffers for parsed metrics — defined here (the only place they're used)
+// rather than as globals exported from data.h.
+static char metricsjsonOutput[240];
+static char metricsCsvOutput[240];
 void loop()
 {
-  modem.pollURC();
-
+  delay(100);
   /*
   if (Serial.available())
   {
@@ -252,7 +229,9 @@ void loop()
   */
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
+
   sensores.updateWindGust(now);
+
   if (timer100ms.check(now))
   {
     //mqttClient.loopMqtt();
@@ -260,42 +239,36 @@ void loop()
 
   digitalWrite(LED1, LOW);
 
-  if (timerBackup.check(now))
-  {
-    processFiles("/falhas", formatedDateString.c_str());
-  }
+  //if (timerBackup.check(now))
+    //processFiles("/falhas", formatedDateString.c_str());
+
   if (timerMain.check(now))
   {
-    mqttClient.reconnect();
+
     digitalWrite(LED1, HIGH);
 
     rtc_wdt_feed(); // -- WATCH-DOG
-    syncClock();
+
     TimeManager::update();
     timestamp = TimeManager::getTimestamp();
-   formatedDateString = TimeManager::getFormatted(FMT_DATE);
-
-    // Computando dados
+    formatedDateString = TimeManager::getFormatted(FMT_DATE);
 
     logDebugf("\n\n Computando dados ...\n");
-
     const Metrics &sensorsData = sensores.getMeasurements(timestamp);
-    parseData(sensorsData);
+    parseData(sensorsData,
+              metricsjsonOutput, sizeof(metricsjsonOutput),
+              metricsCsvOutput,  sizeof(metricsCsvOutput));
 
-    // Apresentação
     logDebugf("\nResultado JSON:\n%s\n", metricsjsonOutput);
 
-    // Armazenamento local
     logDebugln("\n Gravando em disco:");
     storeMeasurement("/metricas", formatedDateString, metricsCsvOutput);
 
-    // Enviando Dados Remotamente
     logDebugln("\n Enviando Resultados:  ");
     bool measurementSent = mqttClient.publish(config.mqtt_topic, metricsjsonOutput);
     if (!measurementSent)
       storeMeasurement("/falhas", formatedDateString, metricsCsvOutput);
 
-    // Update metrics advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("ME: " + String(metricsCsvOutput)).c_str());
     logDebugf("\n >> PROXIMA ITERAÇÃO\n");
   }
@@ -304,47 +277,46 @@ void loop()
   {
     TimeManager::update();
     timestamp = TimeManager::getTimestamp();
-    // Health check
+
     healthCheck.timestamp = timestamp;
-    healthCheck.isWifiConnected = WiFi.status() == WL_CONNECTED;
-    healthCheck.wifiDbmLevel = !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
+    healthCheck.isWifiConnected = true;//WiFi.status() == WL_CONNECTED;
+    healthCheck.wifiDbmLevel = 1;// !healthCheck.isWifiConnected ? 0 : (WiFi.RSSI());
     healthCheck.isMqttConnected = false;//mqttClient.loopMqtt();
     healthCheck.timeRemaining = ((timerMain.lastTime + timerMain.interval - now) / 1000);
 
     digitalWrite(LED2, healthCheck.isWifiConnected);
 
     const char *hcCsv = parseHealthCheckData(healthCheck, 1);
-
     logDebugf("\n\nColetando dados, metricas em %d segundos ...", healthCheck.timeRemaining);
     logDebugf("\n  - %s\n", hcCsv);
-    // Atualizando BLE advertsting value
     BLE::updateValue(HEALTH_CHECK_UUID, ("HC: " + String(hcCsv)).c_str());
 
-    // if(!healthCheck.isWifiConnected)setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
-    //  Garantindo conexão com mqqt broker;
     if (healthCheck.isWifiConnected && !healthCheck.isMqttConnected)
     {
      // healthCheck.isMqttConnected = mqttClient.connectMqtt("\n  - MQTT", config.mqtt_username, config.mqtt_password, config.mqtt_topic);
      // if (healthCheck.isMqttConnected)
      //   mqttClient.subscribe((String("sys") + String(config.mqtt_topic)).c_str());
     }
-    // Enviando dados de health check
+
     char mqttHealthCheck[100];
-    sprintf(mqttHealthCheck, "{\"timestamp\":%lu,\"wifiDBM\":\"%i\"}", timestamp, WiFi.RSSI());
-    mqttClient.publish((sysReportMqttTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1); // retained
+    snprintf(mqttHealthCheck, sizeof(mqttHealthCheck),
+             "{\"timestamp\":%lld,\"wifiDBM\":\"%i\"}",
+             (long long)timestamp,1);
+    mqttClient.publish((sysReportMqttTopic + String("/healthcheck")).c_str(), mqttHealthCheck, 1);
   }
 }
 
-// callbacks
 int bluetoothController(const char *uid, const std::string &content)
 {
   if (content.length() == 0)
     return 0;
   printf("Bluetooth message received: %s\n", uid);
+
   if (content == "@@RESTART")
   {
     logIt("Reiniciando Arduino a força;", true);
     delay(2000);
+    flushLog();
     ESP.restart();
     return 1;
   }
@@ -361,12 +333,14 @@ int bluetoothController(const char *uid, const std::string &content)
     delay(2000);
     createFile(SD, "/config.txt", content.c_str());
     logIt("Reiniciando Arduino a força;", true);
+    flushLog();
     ESP.restart();
     return 1;
   }
   return 0;
 }
 
+/*
 void publishJsonResponse(const char *topic, const JsonObject &response)
 {
   char buffer[512];
@@ -534,7 +508,7 @@ void executeCommand(JsonObject &docData, const char *sysReportMqttTopic)
     }
 
     response["status"] = "single";
-    response["sent"] = sendCSVFile(file, url, id);
+    //response["sent"] = sendCSVFile(file, url, id);
     send(response);
     break;
   }
@@ -657,6 +631,6 @@ void mqttSubCallback(const char *topic, const unsigned char *payload, unsigned i
     executeCommand(docData, sysReportMqttTopic.c_str());
  
   }
-}
+}*/
 
 

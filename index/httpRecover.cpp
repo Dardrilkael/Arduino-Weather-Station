@@ -1,10 +1,9 @@
-#pragma once
-
 #include "pch.h"
 #include "httpClient.h"
 #include <WiFiClient.h>
 #include <SD.h>
 #include "data.h"
+#include "httpClient.h"
 extern HttpClient http;
 static fs::File* g_currentFile = nullptr;
 

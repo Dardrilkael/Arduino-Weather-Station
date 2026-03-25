@@ -10,7 +10,7 @@
 OTA_Result OTA::update(const String &url, std::function<void(int)> onProgress)
 {
     logDebugln("Starting firmware update...");
-
+/*
     HTTPClient http;
 
     if (!http.begin(url))
@@ -96,5 +96,6 @@ OTA_Result OTA::update(const String &url, std::function<void(int)> onProgress)
 
     logDebugln("Download completed successfully.");
     http.end();
+    */
     return OTA_Result(true, "");
 }

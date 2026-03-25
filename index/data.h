@@ -1,4 +1,5 @@
 #pragma once
+#include <time.h>  // for time_t
 // --- Config data  ---
 struct Config
 {
@@ -22,7 +23,7 @@ extern const char *configFileName;
 struct HealthCheck
 {
   const char *softwareVersion;
-  int timestamp;
+  time_t timestamp;   // Fix: was int — truncates 64-bit time_t on ESP-IDF 5.x
   bool isWifiConnected;
   bool isMqttConnected;
   int wifiDbmLevel;
@@ -31,12 +32,15 @@ struct HealthCheck
 
 extern char hcJsonOutput[240];
 extern char hcCsvOutput[240];
+// type=1 → CSV into hcCsvOutput, else → JSON into hcJsonOutput.
+// Returns pointer to whichever buffer was written.
 const char *parseHealthCheckData(HealthCheck hc, int type = 1);
+
 // --- Metrics data  ---
 
 struct Metrics
 {
-  long timestamp = 0;
+  time_t timestamp = 0;  // Fix: was long — truncates 64-bit time_t on ESP-IDF 5.x
   int wind_dir = -1;
   float wind_speed = 0;
   float wind_gust = 0;
@@ -46,11 +50,12 @@ struct Metrics
   float pressure = 0;
 };
 
-extern char metricsjsonOutput[240];
-extern char metricsCsvOutput[240];
-extern char csvHeader[200];
-
-void parseData(const Metrics &metric);
+// Fix #8: was writing to hidden globals metricsjsonOutput / metricsCsvOutput.
+// Caller now passes explicit output buffers — no silent side effects,
+// safe to call from multiple contexts (BLE callback, MQTT callback, loop).
+void parseData(const Metrics &metric,
+               char *jsonOut, size_t jsonSize,
+               char *csvOut,  size_t csvSize);
 
 struct Timer
 {

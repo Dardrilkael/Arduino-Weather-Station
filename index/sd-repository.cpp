@@ -1,4 +1,3 @@
-#pragma once
 #include "sd-repository.h"
 #include "xtensa/hal.h"
 #include "pch.h"
@@ -50,36 +49,47 @@ void createDirectory(const char *directory)
 }
 
 // Parse Mqtt connection string
+// Format: mqtt://username:password@broker:port
 void parseMQTTString(const char *mqttString, char *username, char *password, char *broker, int &port)
 {
-  if (memcmp(mqttString, "mqtt://", 7) != 0)
+  if (!mqttString || memcmp(mqttString, "mqtt://", 7) != 0)
   {
     logDebugf("Invalid MQTT string format!\n");
     return;
   }
-  int size = strlen(mqttString) + 1;
-  char *ptr = new char[size - 7];
-  if (!ptr)
-    return;
-  strlcpy(ptr, mqttString + 7, size - 7);
-  strlcpy(username, strtok(ptr, ":"), 64);
-  strlcpy(password, strtok(NULL, "@"), 64);
-  strlcpy(broker, strtok(NULL, ":"), 64);
-  port = atoi(strtok(NULL, ""));
-  delete[] ptr;
+
+  // Fix #11: replaced new[]/delete[] with a stack buffer — no heap allocation
+  // needed for a small config string, and heap + strtok meant any malformed
+  // input (strtok returning NULL) would crash before delete[] and leak.
+  char buf[128]{0};
+  strlcpy(buf, mqttString + 7, sizeof(buf));
+
+  char *tok;
+  tok = strtok(buf, ":");  if (!tok) { logDebugf("parseMQTTString: missing username\n"); return; }
+  strlcpy(username, tok, 64);
+  tok = strtok(NULL, "@"); if (!tok) { logDebugf("parseMQTTString: missing password\n"); return; }
+  strlcpy(password, tok, 64);
+  tok = strtok(NULL, ":"); if (!tok) { logDebugf("parseMQTTString: missing broker\n");   return; }
+  strlcpy(broker, tok, 64);
+  tok = strtok(NULL, "");  if (!tok) { logDebugf("parseMQTTString: missing port\n");     return; }
+  port = atoi(tok);
 }
 
 // Parse Wifi connection string
+// Format: ssid:password
 void parseWIFIString(const char *wifiString, char *ssid, char *password)
 {
-  int size = strlen(wifiString) + 1;
-  char *ptr = new char[size];
-  if (!ptr)
-    return;
-  strlcpy(ptr, wifiString, size);
-  strlcpy(ssid, strtok(ptr, ":"), 64);
-  strlcpy(password, strtok(NULL, ""), 64);
-  delete[] ptr;
+  if (!wifiString) return;
+
+  // Same fix as parseMQTTString: stack buffer, no heap, NULL guard on strtok
+  char buf[128]{0};
+  strlcpy(buf, wifiString, sizeof(buf));
+
+  char *tok;
+  tok = strtok(buf, ":");  if (!tok) { logDebugf("parseWIFIString: missing ssid\n");     return; }
+  strlcpy(ssid, tok, 64);
+  tok = strtok(NULL, "");  if (!tok) { logDebugf("parseWIFIString: missing password\n"); return; }
+  strlcpy(password, tok, 64);
 }
 
 DeserializationError loadJson(fs::FS &fs, const char *filename, StaticJsonDocument<512> &doc)
@@ -267,14 +277,52 @@ bool loadConfiguration(fs::FS & fs, const char *filename, Config &config, std::s
     return buffer;
   }
 
-  // Adiciona uma nova linha de metricas
-  void storeLog(const char *payload)
+// Log write buffer — accumulates messages in RAM and only opens the SD file
+// when the buffer is full or flushLog() is called explicitly.
+// Fix #9: was opening and closing the file on every single storeLog() call —
+// slow (SD open ~5-10ms each) and causes unnecessary write cycles on the card.
+#define LOG_BUFFER_SIZE 512
+static char logBuffer[LOG_BUFFER_SIZE]{0};
+static size_t logBufferLen = 0;
+
+static void writeLogBuffer()
+{
+  if (logBufferLen == 0) return;
+  File file = SD.open("/logs/boot.txt", FILE_APPEND);
+  if (file)
   {
-    String path = "/logs/boot.txt";
-    File file = SD.open(path, FILE_APPEND);
-    if (file)
-    {
-      file.print(payload);
-    }
+    file.write((const uint8_t *)logBuffer, logBufferLen);
     file.close();
   }
+  logBuffer[0] = '\0';
+  logBufferLen = 0;
+}
+
+void storeLog(const char *payload)
+{
+  if (!payload) return;
+  size_t payloadLen = strlen(payload);
+
+  // If payload alone exceeds buffer, flush current buffer then write directly
+  if (payloadLen >= LOG_BUFFER_SIZE)
+  {
+    writeLogBuffer();
+    File file = SD.open("/logs/boot.txt", FILE_APPEND);
+    if (file) { file.print(payload); file.close(); }
+    return;
+  }
+
+  // If payload won't fit in remaining buffer space, flush first
+  if (logBufferLen + payloadLen >= LOG_BUFFER_SIZE)
+    writeLogBuffer();
+
+  memcpy(logBuffer + logBufferLen, payload, payloadLen);
+  logBufferLen += payloadLen;
+  logBuffer[logBufferLen] = '\0';
+}
+
+// Call before restart, sleep, or any point where buffered logs must be saved.
+void flushLog()
+{
+  writeLogBuffer();
+}
