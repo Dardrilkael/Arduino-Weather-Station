@@ -95,7 +95,7 @@ void setup()
 
   logIt("\n1.1 Iniciando bluetooth;", true);
   esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-  BLE::Init(bluetoothName, bluetoothController);
+  BLE::Init(bluetoothName);
   BLE::updateValue(CONFIGURATION_UUID, jsonConfig);
 
   if (!loadedSD)
@@ -154,6 +154,15 @@ static char metricsCsvOutput[240];
 void loop()
 {
   delay(100);
+
+    // ── BLE mailbox check ──────────────────────────────────────────────
+    if (blePendingCommand.pending) {
+        blePendingCommand.pending = false;          // clear FIRST before acting
+        bluetoothController(blePendingCommand.characteristicUid,
+                            blePendingCommand.content);
+    }
+    // ──────────────────────────────────────────────────────────────────
+
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
 

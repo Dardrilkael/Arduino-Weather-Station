@@ -11,7 +11,8 @@ BLECharacteristic *pConfigCharacteristic = nullptr;
 BLECharacteristic *pHealthCharacteristic = nullptr;
 
 bool deviceConnected = false;
-int (*characteristicCB)(const char *uid, const std::string &content);
+// ADD this — define the mailbox
+BLECommand blePendingCommand;
 
 class ServerCallbacks : public BLEServerCallbacks
 {
@@ -33,20 +34,22 @@ class CharacteristicsCallback : public BLECharacteristicCallbacks
     void onWrite(BLECharacteristic *pCharacteristic)
     {
         std::string rxValue = std::string(pCharacteristic->getValue().c_str());
-        if (rxValue.empty() || !characteristicCB)
+        if (rxValue.empty())
             return;
-        // Fix #2: store the String before calling .c_str() — the temporary
-        // returned by toString() was destroyed before sprintf/callback could
-        // read the pointer, causing a dangling-pointer / UB crash.
-        std::string characteristicUid = pCharacteristic->getUUID().toString().c_str();
-        characteristicCB(characteristicUid.c_str(), rxValue);
+
+        // Don't act here — just fill the mailbox and return immediately.
+        // The main loop will pick it up safely.
+        std::string uid = pCharacteristic->getUUID().toString().c_str();
+        strlcpy(blePendingCommand.characteristicUid, uid.c_str(),
+                sizeof(blePendingCommand.characteristicUid));
+        strlcpy(blePendingCommand.content, rxValue.c_str(),
+                sizeof(blePendingCommand.content));
+        blePendingCommand.pending = true;   // set LAST (acts as the "ready" signal)
     }
 };
 
-void BLE::Init(const char *boardName, int (*callback)(const char *uid, const std::string &content))
+void BLE::Init(const char *boardName)
 {
-    characteristicCB = callback;
-
     char boardOutputName[120]{0};
     const char *boardNameTemplate = "SIT-BOARD-%s";
     sprintf(boardOutputName, boardNameTemplate, boardName);
