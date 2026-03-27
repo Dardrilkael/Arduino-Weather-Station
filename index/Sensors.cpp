@@ -185,29 +185,32 @@ const Metrics &Sensors::getMeasurements(unsigned long timestamp)
 
   noInterrupts();
   anemometerSnapshot = anemometerCounter;
-  rainSnapshot = rainCounter;
+  rainSnapshot       = rainCounter;
+  anemometerCounter -= anemometerSnapshot;  // preserve pulses that arrive during reads
+  rainCounter       -= rainSnapshot;
   interrupts();
 
   m_Measurements.timestamp = timestamp;
-  m_Measurements.wind_speed = ANEMOMETER_CALIBRATION_FACTOR * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0); // m/s
+  m_Measurements.wind_speed = ANEMOMETER_CALIBRATION_FACTOR * (ANEMOMETER_CIRC * anemometerSnapshot) / (config.interval / 1000.0);
   m_Measurements.wind_gust = WIND_GUST_CALIBRATION_FACTOR * ANEMOMETER_CIRC * findMax(rps, sizeof(rps) / sizeof(int));
   m_Measurements.rain_acc = rainSnapshot * mm_per_tip;
   m_Measurements.wind_dir = readWindDirection();
 
   float temperatura1, temperatura2;
-  readDHT(m_Measurements.humidity,temperatura1);
+  readDHT(m_Measurements.humidity, temperatura1);
   readBMP(m_Measurements.pressure, temperatura2);
 
-
-    // Choose temperatura1 if it's valid, otherwise fallback to temperatura2
   if (!isnan(temperatura1)) {
     m_Measurements.temperature = temperatura1;
   } else {
     m_Measurements.temperature = temperatura2;
   }
-  
 
-  reset();
+  // reset() removed — counters already adjusted atomically above
+  gustIndex       = 0;
+  previousCounter = 0;
+  memset(rps, 0, sizeof(rps));
+  
   return m_Measurements;
 }
 
