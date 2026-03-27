@@ -102,6 +102,9 @@ void setup()
     while (!loadConfiguration(SD, configFileName, config, jsonConfig))
       ;
 
+
+   watchdogRTC();
+
   delay(100);
   logIt("\n1.2 Estabelecendo conexão com wifi ", true);
   wifiClient.setupWifi("  - Wifi", config.wifi_ssid, config.wifi_password);
@@ -123,7 +126,7 @@ void setup()
   formatedDateString = TimeManager::getFormatted(FMT_DATE);
   storeLog(TimeManager::getFormatted(FMT_FULL));
 
-  watchdogRTC();
+ 
 
   for (int i = 0; i < 7; i++)
   {
