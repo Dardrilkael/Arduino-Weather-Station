@@ -26,7 +26,6 @@
 // Timing intervals in milliseconds
 constexpr unsigned long WDT_TIMEOUT_MS = 600000;
 
-Timer timer100ms(100);
 Timer timerBackup(3600000); // 1 hour
 Timer timerMain(0);         // interval set correctly in setup() after config loads
 Timer timerHealthCheck(10000);
@@ -144,7 +143,6 @@ void setup()
   startTime = millis();
   timerMain.interval = config.interval;
   timerMain.lastTime = startTime;
-  timer100ms.lastTime = startTime;
   timerBackup.lastTime = startTime - timerBackup.interval;
   timerHealthCheck.lastTime = startTime;
 }
@@ -171,8 +169,8 @@ void loop()
 
   sensores.updateWindGust(now);
 
-  if (timer100ms.check(now))
-    mqttClient.loopMqtt();
+
+  mqttClient.loopMqtt();
 
   digitalWrite(LED1, LOW);
 
@@ -212,6 +210,7 @@ void loop()
 
   if (timerHealthCheck.check(now))
   {
+    rtc_wdt_feed();
     TimeManager::update();
     timestamp = TimeManager::getTimestamp();
 
