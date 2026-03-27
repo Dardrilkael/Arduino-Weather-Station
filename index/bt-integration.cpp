@@ -13,7 +13,7 @@ BLECharacteristic *pHealthCharacteristic = nullptr;
 bool deviceConnected = false;
 // ADD this — define the mailbox
 BLECommand blePendingCommand;
-
+extern TaskHandle_t bleTaskHandle;
 class ServerCallbacks : public BLEServerCallbacks
 {
     void onConnect(BLEServer *pServer)
@@ -45,6 +45,8 @@ class CharacteristicsCallback : public BLECharacteristicCallbacks
         strlcpy(blePendingCommand.content, rxValue.c_str(),
                 sizeof(blePendingCommand.content));
         blePendingCommand.pending = true;   // set LAST (acts as the "ready" signal)
+
+        vTaskNotifyGiveFromISR(bleTaskHandle, nullptr);
     }
 };
 

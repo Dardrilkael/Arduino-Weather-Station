@@ -59,12 +59,25 @@ void watchdogRTC()
   rtc_wdt_protect_on();
 }
 
+TaskHandle_t bleTaskHandle = nullptr;
+
+void bleTask(void *param)
+{
+    for (;;)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY); // sleeps until notified
+        bluetoothController(blePendingCommand.characteristicUid,
+                            blePendingCommand.content);
+    }
+}
+
 void setup()
 {
   #if DEBUG_LOG_ENABLED
     Serial.begin(115200);
   #endif
 
+  xTaskCreatePinnedToCore(bleTask, "bleTask", 4096, nullptr, 1, &bleTaskHandle, 0);
   delay(3000);
   logIt("\n >> Sistema Integrado de meteorologia << \n");
 
@@ -155,14 +168,14 @@ static char metricsCsvOutput[240];
 void loop()
 {
   delay(100);
-
+/*
     // ── BLE mailbox check ──────────────────────────────────────────────
     if (blePendingCommand.pending) {
         blePendingCommand.pending = false;          // clear FIRST before acting
         bluetoothController(blePendingCommand.characteristicUid,
                             blePendingCommand.content);
     }
-    // ──────────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────*/
 
   digitalWrite(LED3, HIGH);
   unsigned long now = millis();
