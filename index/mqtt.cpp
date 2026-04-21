@@ -29,19 +29,19 @@ bool MQTT::connectMqtt(const char *contextName, const char *mqtt_username, const
 {
   if (!m_Client->connected())
   {
-    logDebugf("%s: Tentando nova conexão...", contextName);
+    logDebugf("%s: Tentando nova conexão...\n", contextName);
     String clientId = "ESP32Client-";
     clientId += String(random(0xffff), HEX);
     if (m_Client->connect(clientId.c_str(), mqtt_username, mqtt_password))
     {
-      logDebugf("%s: Reconectado", contextName);
+      logDebugf("%s: Reconectado\n", contextName);
       return true;
     }
     logDebug("failed, rc=");
     logDebug(m_Client->state());
     return false;
   }
-  logDebugf("%s: Conectado [ %s ]", contextName, mqtt_topic);
+  logDebugf("%s: Conectado [ %s ]\n", contextName, mqtt_topic);
   return true;
 }
 
@@ -94,3 +94,5 @@ int MQTT::write(const unsigned char *buffer, int size)
 {
   return m_Client->write(buffer, size);
 }
+
+bool MQTT::connected() { return m_Client->connected(); }

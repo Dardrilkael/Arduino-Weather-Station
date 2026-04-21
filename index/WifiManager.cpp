@@ -23,7 +23,6 @@ int WifiManager::setupWifi(const char* contextName, const char* ssid, const char
     WiFi.mode(WIFI_STA);
     WiFi.begin(savedSSID.c_str(), savedPassword.c_str());
 
-
     while (WiFi.status() != WL_CONNECTED)
     {
         for (int i = 0; i < 5; i++)

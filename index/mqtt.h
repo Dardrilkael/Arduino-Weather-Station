@@ -18,6 +18,7 @@ public:
     int endPublish();
     int write(char);
     int write(const unsigned char *buffer, int size);
+    bool connected();
 
 private:
     WiFiClient *m_WifiClient;

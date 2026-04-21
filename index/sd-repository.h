@@ -3,6 +3,8 @@
 #include "SD.h"
 #include <ArduinoJson.h>
 #include "data.h"
+#include <string>
+
 
 // Inicia leitura cartão SD
 void initSdCard();
@@ -16,16 +18,16 @@ void parseMQTTString(const char *mqttString, char *username, char *password, cha
 void parseWIFIString(const char *wifiString, char *ssid, char *password);
 
 DeserializationError loadJson(fs::FS &fs, const char *filename, StaticJsonDocument<512> &doc);
-  // Carrega arquivo de configuração inicial
+// Carrega arquivo de configuração inicial
 bool loadConfiguration(fs::FS & fs, const char *filename, Config &config, std::string &configJson);
 
-  // Cria um novo arquivo
+// Cria um novo arquivo
 void createFile(fs::FS & fs, const char *path, const char *message);
 
-  // Escreve em arquivo
+// Escreve em arquivo
 void appendFile(fs::FS & fs, const char *path, const char *message);
 
-  // Mover isso daqui para um caso de uso
+// Mover isso daqui para um caso de uso
 void storeMeasurement(String directory, String fileName, const char *payload);
 
 int getDirNameLength(File & dir);
